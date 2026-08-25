@@ -1,12 +1,13 @@
 from typing import Optional
 from uuid import UUID
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Job, Queue
-from ..schemas import JobCreate, JobResponse
+from ..schemas import JobCreate, JobResponse, JobExecutionResponse, PaginatedResponse
 from ..auth import resolve_project
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -65,21 +66,35 @@ def create_scheduled_job(body: JobCreate, project_id: UUID = Depends(resolve_pro
     return _job_to_response(job)
 
 
-@router.get("/", response_model=list[JobResponse])
+@router.get("/", response_model=PaginatedResponse[JobResponse])
 def list_jobs(
     status: Optional[str] = Query(None, description="Filter by status"),
     queue_name: Optional[str] = Query(None, description="Filter by queue name"),
+    start_date: Optional[datetime] = Query(None, description="Filter jobs created after this date"),
+    end_date: Optional[datetime] = Query(None, description="Filter jobs created before this date"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     project_id: UUID = Depends(resolve_project),
     db: Session = Depends(get_db),
 ):
-    """List all jobs, newest first. Optionally filter by status or queue."""
+    """List all jobs, newest first. Optionally filter by status, queue, or creation date."""
     query = db.query(Job).join(Queue).filter(Queue.project_id == project_id).order_by(Job.created_at.desc())
     if status:
         query = query.filter(Job.status == status)
     if queue_name:
         query = query.filter(Queue.name == queue_name)
-    jobs = query.all()
-    return [_job_to_response(j) for j in jobs]
+    if start_date:
+        query = query.filter(Job.created_at >= start_date)
+    if end_date:
+        query = query.filter(Job.created_at <= end_date)
+        
+    total = query.count()
+    jobs = query.offset(offset).limit(limit).all()
+    
+    return {
+        "items": [_job_to_response(j) for j in jobs],
+        "total": total
+    }
 
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -89,3 +104,14 @@ def get_job(job_id: UUID, project_id: UUID = Depends(resolve_project), db: Sessi
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return _job_to_response(job)
+
+@router.get("/{job_id}/executions", response_model=list[JobExecutionResponse])
+def get_job_executions(job_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+    """Get executions for a job."""
+    from ..models import JobExecution
+    job = db.query(Job).join(Queue).filter(Job.id == job_id, Queue.project_id == project_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    executions = db.query(JobExecution).filter(JobExecution.job_id == job_id).order_by(JobExecution.attempt_number.asc()).all()
+    return executions

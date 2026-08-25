@@ -3,6 +3,13 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
+from typing import Generic, TypeVar, List
+
+T = TypeVar("T")
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: List[T]
+    total: int | None = None
 
 
 class JobCreate(BaseModel):
@@ -38,6 +45,19 @@ class JobResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None = None
     completed_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+class JobExecutionResponse(BaseModel):
+    id: UUID
+    job_id: UUID
+    attempt_number: int
+    worker_id: str
+    status: str
+    started_at: datetime
+    completed_at: datetime | None = None
+    error: str | None = None
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 

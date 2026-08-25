@@ -4,6 +4,24 @@ The Distributed Job Scheduler is composed of several independent services design
 
 ## Components
 
+```mermaid
+flowchart TD
+    UI[Next.js Dashboard] -->|REST / JWT| API(FastAPI Backend)
+    API <--> DB[(PostgreSQL)]
+    
+    subgraph Workers
+        W1[Worker 1]
+        W2[Worker 2]
+        W3[Worker 3]
+    end
+    W1 <-->|SELECT FOR UPDATE SKIP LOCKED| DB
+    W2 <-->|SELECT FOR UPDATE SKIP LOCKED| DB
+    W3 <-->|SELECT FOR UPDATE SKIP LOCKED| DB
+    
+    Sched[Scheduler] -->|Cron Eval| DB
+    Reaper[Reaper] -->|Stale Job Cleanup| DB
+```
+
 ### 1. Next.js Frontend (`/frontend`)
 - A React-based web application providing a UI for users to monitor jobs, manage queues, and view scheduled tasks.
 - Communicates exclusively with the FastAPI Backend via REST using JWT tokens for authentication.

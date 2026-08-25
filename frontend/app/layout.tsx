@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ThemeProvider } from "../components/ThemeProvider";
+import { DashboardLayout } from "../components/DashboardLayout";
 
 export const metadata: Metadata = {
   title: "Job Scheduler Dashboard",
@@ -19,7 +21,13 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body style={{ fontFamily: "'Inter', sans-serif" }}>{children}</body>
+      <body>
+        <ThemeProvider>
+          <DashboardLayout>
+            {children}
+          </DashboardLayout>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

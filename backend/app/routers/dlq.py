@@ -1,21 +1,32 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Job, DeadLetterJob, Queue
-from ..schemas import JobResponse, DeadLetterJobResponse
+from ..schemas import JobResponse, DeadLetterJobResponse, PaginatedResponse
 from ..auth import resolve_project
 
 router = APIRouter(prefix="/dlq", tags=["dlq"])
 
 
-@router.get("/", response_model=list[DeadLetterJobResponse])
-def list_dlq(project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+@router.get("/", response_model=PaginatedResponse[DeadLetterJobResponse])
+def list_dlq(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    project_id: UUID = Depends(resolve_project),
+    db: Session = Depends(get_db)
+):
     """List all dead letter jobs."""
-    return db.query(DeadLetterJob).join(Job).join(Queue).filter(Queue.project_id == project_id).order_by(DeadLetterJob.created_at.desc()).all()
+    query = db.query(DeadLetterJob).join(Job).join(Queue).filter(Queue.project_id == project_id).order_by(DeadLetterJob.created_at.desc())
+    total = query.count()
+    items = query.offset(offset).limit(limit).all()
+    return {
+        "items": items,
+        "total": total
+    }
 
 
 @router.post("/{dlq_id}/retry", response_model=JobResponse)

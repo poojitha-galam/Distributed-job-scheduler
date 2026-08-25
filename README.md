@@ -44,3 +44,10 @@ To run the pytest suite inside the backend container:
 ```bash
 docker compose exec backend pytest tests/
 ```
+
+## Known Limitations / Future Work
+
+Given the project timeline, the following features were not implemented and would be the next additions for a production version:
+- **Batch Jobs:** Grouping jobs and tracking aggregate group completion.
+- **Idempotency Keys:** Native deduplication on job submission.
+- **Metrics/Charts:** Visualizing throughput over time in the dashboard rather than just current totals.

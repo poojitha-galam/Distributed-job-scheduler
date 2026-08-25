@@ -50,28 +50,42 @@ export default function Register() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-4 py-10 sm:px-8">
-      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-xl border border-gray-800 bg-gray-900/60 p-8 backdrop-blur">
-        <h1 className="mb-6 text-2xl font-bold tracking-tight text-white">Create an Account</h1>
-        <div className="flex flex-col gap-4">
-          <input type="text" placeholder="Full Name" value={name} onChange={e => setName(e.target.value)} required
-            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none transition focus:border-blue-500" />
-          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required
-            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none transition focus:border-blue-500" />
-          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required
-            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none transition focus:border-blue-500" />
-          <input type="text" placeholder="Organization Name" value={orgName} onChange={e => setOrgName(e.target.value)} required
-            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none transition focus:border-blue-500" />
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "var(--bg-color)"
+    }}>
+      <form onSubmit={handleSubmit} className="neu-box animate-fade-in-up" style={{ width: "100%", maxWidth: "450px", padding: "40px" }}>
+        <h1 className="fw-bold text-primary mb-6" style={{ fontSize: "2rem", textAlign: "center" }}>Create Account</h1>
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <label className="fw-semibold text-secondary">Full Name</label>
+            <input type="text" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required className="neu-input" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="fw-semibold text-secondary">Email</label>
+            <input type="email" placeholder="john@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="neu-input" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="fw-semibold text-secondary">Password</label>
+            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="neu-input" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="fw-semibold text-secondary">Organization</label>
+            <input type="text" placeholder="Acme Corp" value={orgName} onChange={e => setOrgName(e.target.value)} required className="neu-input" />
+          </div>
           
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          <button type="submit" className="mt-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-500 transition">
+          {error && <p className="text-danger text-sm fw-semibold text-center">{error}</p>}
+          <button type="submit" className="neu-button primary mt-4" style={{ padding: "12px", width: "100%" }}>
             Register
           </button>
         </div>
-        <p className="mt-6 text-center text-sm text-gray-400">
-          Already have an account? <Link href="/login" className="text-blue-400 hover:underline">Log in</Link>
+        <p className="mt-8 text-center text-secondary">
+          Already have an account? <Link href="/login" className="fw-bold text-primary hover:underline">Log in</Link>
         </p>
       </form>
-    </main>
+    </div>
   );
 }

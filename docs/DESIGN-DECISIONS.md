@@ -38,3 +38,20 @@ For the final submission, database tables are created at startup via SQLAlchemy'
 
 In a production system with real user data, the next step would be to generate a single baseline Alembic migration from the final `create_all()` schema and resume the Alembic chain from there.
 
+## Process-level vs thread-level worker concurrency
+
+Concurrency is achieved by running multiple worker processes (each single-threaded, processing one job at a time) rather than a single process handling multiple jobs concurrently via threads or asyncio. 
+
+**Trade-off:** This model is simpler and strongly isolates failures — one worker crashing due to a bad job will never affect other in-flight jobs. The cost is that it requires more processes (and memory overhead) for the same throughput compared to an async single-process model.
+
+## Why we overwrite job status (and use a separate executions table)
+
+Instead of appending every state change as a new row in a single event-sourced table, we overwrite the `status` column on the main `jobs` table (QUEUED -> CLAIMED -> RUNNING -> COMPLETED). However, we simultaneously append detailed historical records to the `job_executions` table for every *attempt*.
+
+**Trade-off:** Overwriting the main `status` column makes polling queries (like `SELECT ... WHERE status = 'QUEUED'`) extremely fast and index-friendly, avoiding complex window functions or subqueries required in purely append-only event-sourcing. The `job_executions` table still preserves the robust, append-only historical timeline required for observability and auditing in the dashboard.
+
+## QUEUED status reused for scheduled/delayed jobs, no separate SCHEDULED status
+
+Delayed and scheduled jobs use `status='QUEUED'` combined with a `scheduled_at` timestamp filter rather than a distinct `SCHEDULED` status. 
+
+**Trade-off:** Since the two states have no behavioral difference once a job becomes eligible to run, this avoids an extra status transition that would need to be tracked and updated by a background process, yielding no operational benefit.

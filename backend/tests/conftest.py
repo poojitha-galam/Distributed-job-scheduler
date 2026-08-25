@@ -63,7 +63,9 @@ def test_project(db, test_user):
     queues = db.query(Queue).filter(Queue.project_id == project.id).all()
     queue_ids = [q.id for q in queues]
     if queue_ids:
+        from app.models import JobExecution
         db.query(DeadLetterJob).filter(DeadLetterJob.job_id.in_(db.query(Job.id).filter(Job.queue_id.in_(queue_ids)))).delete(synchronize_session=False)
+        db.query(JobExecution).filter(JobExecution.job_id.in_(db.query(Job.id).filter(Job.queue_id.in_(queue_ids)))).delete(synchronize_session=False)
         db.query(Job).filter(Job.queue_id.in_(queue_ids)).delete(synchronize_session=False)
         db.query(ScheduledJob).filter(ScheduledJob.queue_id.in_(queue_ids)).delete(synchronize_session=False)
     db.query(ApiKey).filter(ApiKey.project_id == project.id).delete(synchronize_session=False)

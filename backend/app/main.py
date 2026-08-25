@@ -53,6 +53,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import time
+from fastapi import Request
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time_ms = (time.time() - start_time) * 1000
+    logger.info(f"method={request.method} path={request.url.path} status_code={response.status_code} processing_time_ms={process_time_ms:.2f}")
+    return response
+
 app.include_router(jobs.router, prefix="/api/v1")
 app.include_router(dlq.router, prefix="/api/v1")
 app.include_router(schedules.router, prefix="/api/v1")

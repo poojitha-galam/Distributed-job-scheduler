@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Queue, Job
-from ..schemas import QueueCreate, QueueUpdate, QueueResponse, QueueStatsResponse
+from ..schemas import QueueCreate, QueueUpdate, QueueResponse, QueueStatsResponse, PaginatedResponse
 from ..auth import resolve_project
 
 router = APIRouter(prefix="/queues", tags=["queues"])
@@ -66,10 +66,21 @@ def create_queue(body: QueueCreate, project_id: UUID = Depends(resolve_project),
     return _queue_to_response(db, queue)
 
 
-@router.get("/", response_model=list[QueueResponse])
-def list_queues(project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
-    queues = db.query(Queue).filter(Queue.project_id == project_id).order_by(Queue.priority.desc(), Queue.name.asc()).all()
-    return [_queue_to_response(db, q) for q in queues]
+@router.get("/", response_model=PaginatedResponse[QueueResponse])
+def list_queues(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    project_id: UUID = Depends(resolve_project),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Queue).filter(Queue.project_id == project_id).order_by(Queue.priority.desc(), Queue.name.asc())
+    total = query.count()
+    queues = query.offset(offset).limit(limit).all()
+    
+    return {
+        "items": [_queue_to_response(db, q) for q in queues],
+        "total": total
+    }
 
 
 @router.get("/{queue_id}", response_model=QueueResponse)

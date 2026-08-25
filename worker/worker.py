@@ -7,6 +7,7 @@ simulates execution, and marks it COMPLETED (or FAILED on exception).
 
 import logging
 import os
+import signal
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -139,6 +140,18 @@ class DeadLetterJob(Base):
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
+class JobExecution(Base):
+    __tablename__ = "job_executions"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    worker_id: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
 
 # ---------------------------------------------------------------------------
 # Job processing
@@ -201,6 +214,16 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
     job.status = "RUNNING"
     job.started_at = datetime.now(timezone.utc)
     job.last_heartbeat = datetime.now(timezone.utc)
+    
+    execution = JobExecution(
+        job_id=job.id,
+        attempt_number=job.attempt_count,
+        worker_id=worker_id,
+        status="RUNNING",
+        started_at=job.started_at
+    )
+    db.add(execution)
+    
     db.commit()
     logger.info("Job %s | CLAIMED -> RUNNING (queue '%s')", job.id, queue_name)
 
@@ -238,6 +261,10 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
         job.status = "COMPLETED"
         job.completed_at = datetime.now(timezone.utc)
         job.result = result
+        
+        execution.status = "COMPLETED"
+        execution.completed_at = job.completed_at
+        
         db.commit()
         logger.info("Job %s | RUNNING -> COMPLETED (queue '%s')", job.id, queue_name)
 
@@ -247,6 +274,11 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
             job.status = "FAILED"
             job.completed_at = datetime.now(timezone.utc)
             job.error = str(exc)
+            
+            execution.status = "FAILED"
+            execution.completed_at = job.completed_at
+            execution.error = str(exc)
+            
             db.commit()
             logger.error("Job %s | RUNNING -> FAILED (max attempts) | %s", job.id, exc)
             
@@ -273,6 +305,11 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
             job.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
             job.last_error = str(exc)
             job.claimed_by = None
+            
+            execution.status = "FAILED"
+            execution.completed_at = datetime.now(timezone.utc)
+            execution.error = str(exc)
+            
             db.commit()
             logger.warning("Job %s | RUNNING -> QUEUED (Retry in %ds) | %s", job.id, delay, exc)
     finally:
@@ -282,11 +319,21 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
 # ---------------------------------------------------------------------------
 # Main polling loop
 # ---------------------------------------------------------------------------
+SHUTDOWN_REQUESTED = False
+
+def handle_shutdown(signum, frame):
+    global SHUTDOWN_REQUESTED
+    logger.info("Shutdown requested. Worker will exit after current job finishes.")
+    SHUTDOWN_REQUESTED = True
+
 def poll() -> None:
+    signal.signal(signal.SIGINT, handle_shutdown)
+    signal.signal(signal.SIGTERM, handle_shutdown)
+
     worker_id = os.getenv("WORKER_ID", f"worker-{uuid.uuid4().hex[:6]}")
     logger.info("Worker [%s] started -- polling every %ds", worker_id, POLL_INTERVAL)
 
-    while True:
+    while not SHUTDOWN_REQUESTED:
         db: Session | None = None
         try:
             db = SessionLocal()
@@ -299,7 +346,10 @@ def poll() -> None:
             if db:
                 db.close()
 
-        time.sleep(POLL_INTERVAL)
+        if not SHUTDOWN_REQUESTED:
+            time.sleep(POLL_INTERVAL)
+            
+    logger.info("Worker [%s] stopped cleanly.", worker_id)
 
 
 if __name__ == "__main__":

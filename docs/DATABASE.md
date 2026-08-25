@@ -24,12 +24,14 @@ The domain models are structured to strictly enforce data isolation across organ
 
 ```mermaid
 erDiagram
-    Organization ||--o{ User : "has members"
+    Organization ||--o{ OrganizationMember : "has members"
+    User ||--o{ OrganizationMember : "belongs to"
     Organization ||--o{ Project : owns
     Project ||--o{ Queue : groups
     Project ||--o{ ApiKey : authenticates
     Queue ||--o{ Job : contains
     Queue ||--o{ ScheduledJob : contains
+    Job ||--o{ DeadLetterJob : produces
 ```
 
 ### Hierarchy Rules

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from ..database import get_db
 from ..models import ScheduledJob, Queue
-from ..schemas import ScheduledJobCreate, ScheduledJobResponse
+from ..schemas import ScheduledJobCreate, ScheduledJobResponse, PaginatedResponse
 from ..auth import resolve_project
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
@@ -40,16 +40,25 @@ def create_schedule(body: ScheduledJobCreate, project_id: UUID = Depends(resolve
     db.refresh(schedule)
     return schedule
 
-@router.get("/", response_model=list[ScheduledJobResponse])
+@router.get("/", response_model=PaginatedResponse[ScheduledJobResponse])
 def list_schedules(
     enabled: Optional[bool] = Query(None, description="Filter by enabled status"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     project_id: UUID = Depends(resolve_project),
     db: Session = Depends(get_db),
 ):
     query = db.query(ScheduledJob).join(Queue).filter(Queue.project_id == project_id).order_by(ScheduledJob.created_at.desc())
     if enabled is not None:
         query = query.filter(ScheduledJob.enabled == enabled)
-    return query.all()
+        
+    total = query.count()
+    schedules = query.offset(offset).limit(limit).all()
+    
+    return {
+        "items": schedules,
+        "total": total
+    }
 
 @router.get("/{schedule_id}", response_model=ScheduledJobResponse)
 def get_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):

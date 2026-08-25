@@ -29,23 +29,28 @@ interface Job {
   next_retry_at: string | null;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  QUEUED: "bg-gray-500/20 text-gray-300 border border-gray-500/30",
-  CLAIMED: "bg-purple-500/20 text-purple-300 border border-purple-500/30",
-  RUNNING: "bg-blue-500/20 text-blue-300 border border-blue-500/30 animate-pulse",
-  COMPLETED: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30",
-  FAILED: "bg-red-500/20 text-red-300 border border-red-500/30",
-};
-
 function StatusBadge({ status }: { status: string }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide ${STATUS_STYLES[status] ?? "bg-gray-700 text-gray-300"}`}>
-      {status}
-    </span>
-  );
+  const map: Record<string, string> = {
+    QUEUED: "badge-secondary",
+    CLAIMED: "badge-warning",
+    RUNNING: "badge-primary",
+    COMPLETED: "badge-success",
+    FAILED: "badge-danger",
+  };
+  return <span className={`badge ${map[status] || "badge-secondary"}`}>{status}</span>;
 }
 
 function fmtDate(iso: string | null) { return iso ? new Date(iso).toLocaleString() : "\u2014"; }
+
+interface JobExecution {
+  id: string;
+  attempt_number: number;
+  worker_id: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+}
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -53,18 +58,27 @@ export default function JobDetailPage() {
   const id = params.id as string;
   
   const [job, setJob] = useState<Job | null>(null);
+  const [executions, setExecutions] = useState<JobExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetchApi(`/jobs/${id}`);
-      if (res.ok) {
-        setJob(await res.json());
+      const [jobRes, execRes] = await Promise.all([
+        fetchApi(`/jobs/${id}`),
+        fetchApi(`/jobs/${id}/executions`)
+      ]);
+      
+      if (jobRes.ok) {
+        setJob(await jobRes.json());
       } else {
-        const err = await res.json().catch(() => null);
+        const err = await jobRes.json().catch(() => null);
         setError(err?.detail || "Failed to load job");
+      }
+      
+      if (execRes.ok) {
+        setExecutions(await execRes.json());
       }
     } catch (e: any) {
       setError(e.message);
@@ -93,72 +107,101 @@ export default function JobDetailPage() {
     }
   }
 
-  if (loading) {
-    return <div className="p-10 text-gray-400">Loading...</div>;
-  }
-
-  if (error || !job) {
-    return <div className="p-10 text-red-400">{error || "Job not found"}</div>;
-  }
+  if (loading) return <div className="p-6 text-secondary animate-fade-in-up">Loading...</div>;
+  if (error || !job) return <div className="p-6 text-danger fw-bold animate-fade-in-up">{error || "Job not found"}</div>;
 
   return (
-    <main className="min-h-screen px-4 py-10 sm:px-8">
-      <div className="mx-auto max-w-4xl">
-        <Link href="/" className="text-sm font-medium text-blue-400 hover:text-blue-300 mb-6 inline-flex items-center gap-1">
-          ← Back to Dashboard
-        </Link>
+    <div style={{ paddingBottom: "40px" }} className="animate-fade-in-up">
+      <div className="flex items-center gap-4 mb-8">
+        <button className="neu-button" onClick={() => router.back()} style={{ padding: "8px" }}>
+          ←
+        </button>
+        <div>
+          <h1 className="fw-bold text-primary" style={{ fontSize: "1.8rem" }}>Job: {job.name}</h1>
+          <div className="flex items-center gap-4 mt-2">
+            <span className="text-secondary fw-semibold">ID: #{id.split('-')[0]}</span>
+            <StatusBadge status={job.status} />
+          </div>
+        </div>
+      </div>
+      
+      <div className="neu-box" style={{ maxWidth: "1000px" }}>
+        <div className="grid gap-6 sm:grid-cols-3 mb-6 border-b" style={{ borderColor: 'var(--border-color)', paddingBottom: '24px' }}>
+          <div>
+            <div className="text-secondary text-sm fw-semibold uppercase tracking-wider mb-1">Queue</div>
+            <div className="fw-bold">{job.queue_name || "\u2014"}</div>
+          </div>
+          <div>
+            <div className="text-secondary text-sm fw-semibold uppercase tracking-wider mb-1">Worker</div>
+            <div className="fw-bold">{job.claimed_by || "\u2014"}</div>
+          </div>
+          <div>
+            <div className="text-secondary text-sm fw-semibold uppercase tracking-wider mb-1">Schedule Type</div>
+            <div className="fw-bold">{job.is_recurring ? "Recurring" : job.scheduled_at ? "Scheduled" : "Immediate"}</div>
+          </div>
+        </div>
         
-        <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-6 backdrop-blur">
-          <div className="mb-6 border-b border-gray-800 pb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Job: {job.name}</h1>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-400">
-              <div><span className="font-semibold text-gray-500 uppercase text-xs tracking-wider">Status:</span> <StatusBadge status={job.status} /></div>
-              <div><span className="font-semibold text-gray-500 uppercase text-xs tracking-wider">Queue:</span> {job.queue_name || "\u2014"}</div>
-              <div><span className="font-semibold text-gray-500 uppercase text-xs tracking-wider">Worker:</span> {job.claimed_by || "\u2014"}</div>
+        <div className="grid gap-8 sm:grid-cols-2">
+          <div className="neu-card">
+            <h2 className="text-primary fw-bold mb-4" style={{ fontSize: "1.2rem" }}>Timeline</h2>
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-between border-b" style={{ borderColor: 'var(--border-color)', paddingBottom: '8px' }}><span className="text-secondary fw-semibold">Created</span><span className="fw-bold">{fmtDate(job.created_at)}</span></div>
+              <div className="flex justify-between border-b" style={{ borderColor: 'var(--border-color)', paddingBottom: '8px' }}><span className="text-secondary fw-semibold">Started</span><span className="fw-bold">{fmtDate(job.started_at)}</span></div>
+              <div className="flex justify-between"><span className="text-secondary fw-semibold">Completed</span><span className="fw-bold">{fmtDate(job.completed_at)}</span></div>
             </div>
           </div>
           
-          <div className="grid gap-8 sm:grid-cols-2">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-4 border-b border-gray-800 pb-2">Timeline</h2>
-              <dl className="flex flex-col gap-3 text-sm">
-                <div className="flex justify-between border-b border-gray-800/50 pb-2"><dt className="text-gray-500">Created</dt><dd className="text-gray-200">{fmtDate(job.created_at)}</dd></div>
-                <div className="flex justify-between border-b border-gray-800/50 pb-2"><dt className="text-gray-500">Started</dt><dd className="text-gray-200">{fmtDate(job.started_at)}</dd></div>
-                <div className="flex justify-between"><dt className="text-gray-500">Completed</dt><dd className="text-gray-200">{fmtDate(job.completed_at)}</dd></div>
-              </dl>
-            </div>
-            
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-4 border-b border-gray-800 pb-2">Execution</h2>
-              <dl className="flex flex-col gap-3 text-sm">
-                <div className="flex justify-between border-b border-gray-800/50 pb-2"><dt className="text-gray-500">Attempts</dt><dd className="text-gray-200">{job.attempt_count} / {job.max_attempts} (max)</dd></div>
-                <div className="flex justify-between"><dt className="text-gray-500">Retry Policy</dt><dd className="text-gray-200">{job.retry_policy}</dd></div>
-              </dl>
+          <div className="neu-card">
+            <h2 className="text-primary fw-bold mb-4" style={{ fontSize: "1.2rem" }}>Configuration</h2>
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-between border-b" style={{ borderColor: 'var(--border-color)', paddingBottom: '8px' }}><span className="text-secondary fw-semibold">Attempts</span><span className="fw-bold">{job.attempt_count} / {job.max_attempts}</span></div>
+              <div className="flex justify-between border-b" style={{ borderColor: 'var(--border-color)', paddingBottom: '8px' }}><span className="text-secondary fw-semibold">Retry Policy</span><span className="fw-bold">{job.retry_policy}</span></div>
             </div>
           </div>
-          
-          {(job.last_error || job.error) && (
-            <div className="mt-8">
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-4 border-b border-gray-800 pb-2">Last Error</h2>
-              <pre className="p-4 bg-gray-950 rounded-lg text-red-400 text-xs overflow-auto font-mono whitespace-pre-wrap border border-red-900/30">
-                {job.error || job.last_error}
-              </pre>
-            </div>
-          )}
-          
-          {job.status === "FAILED" && (
-            <div className="mt-8 pt-6 border-t border-gray-800">
-              <button 
-                onClick={handleRetry} 
-                disabled={retrying}
-                className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 disabled:opacity-50"
-              >
-                {retrying ? "Retrying..." : "Retry Job"}
-              </button>
+        </div>
+        
+        <div className="mt-8">
+          <h2 className="text-primary fw-bold mb-4" style={{ fontSize: "1.2rem" }}>Execution History</h2>
+          {executions.length === 0 ? (
+            <div className="neu-card text-center text-secondary">No execution history available.</div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {executions.map((ex, idx) => (
+                <div key={ex.id} className={`neu-card flex flex-col gap-3 animate-fade-in-up animate-delay-${(idx % 3) + 1}`}>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <span className="fw-bold text-primary">Attempt {ex.attempt_number}</span>
+                      <StatusBadge status={ex.status} />
+                    </div>
+                    <span className="text-muted fw-bold">Worker: {ex.worker_id}</span>
+                  </div>
+                  <div className="flex gap-6 text-sm text-secondary">
+                    <div>Started: <span className="fw-bold">{fmtDate(ex.started_at)}</span></div>
+                    {ex.completed_at && <div>Completed: <span className="fw-bold">{fmtDate(ex.completed_at)}</span></div>}
+                  </div>
+                  {ex.error && (
+                    <div className="neu-input" style={{ color: "var(--danger-color)", fontSize: "0.9rem", fontFamily: "monospace", marginTop: "8px" }}>
+                      {ex.error}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
+        
+        {job.status === "FAILED" && (
+          <div className="mt-8 pt-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
+            <button 
+              onClick={handleRetry} 
+              disabled={retrying}
+              className="neu-button primary"
+            >
+              {retrying ? "Retrying..." : "Retry Job (DLQ)"}
+            </button>
+          </div>
+        )}
       </div>
-    </main>
+    </div>
   );
 }

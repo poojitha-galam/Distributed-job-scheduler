@@ -1,10 +1,366 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+:root {
+  /* Light Mode Variables (Default) */
+  --bg-color: #f0f2f5;
+  --surface-color: #f0f2f5;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  
+  --success-color: #10b981;
+  --danger-color: #ef4444;
+  --warning-color: #f59e0b;
 
-/* ── Custom base styles ── */
-@layer base {
-  body {
-    @apply bg-gray-950 text-gray-100 antialiased;
+  --border-color: rgba(255, 255, 255, 0.5);
+
+  /* Neumorphic Shadows (Light Mode) */
+  --shadow-light: #ffffff;
+  --shadow-dark: #c8cbd0;
+  
+  --neu-flat: 
+    8px 8px 16px var(--shadow-dark), 
+    -8px -8px 16px var(--shadow-light);
+    
+  --neu-pressed: 
+    inset 4px 4px 8px var(--shadow-dark), 
+    inset -4px -4px 8px var(--shadow-light);
+    
+  --neu-elevated: 
+    12px 12px 24px var(--shadow-dark), 
+    -12px -12px 24px var(--shadow-light);
+
+  --neu-sm: 
+    4px 4px 8px var(--shadow-dark), 
+    -4px -4px 8px var(--shadow-light);
+    
+  /* Animation Timing */
+  --transition-speed: 0.3s;
+}
+
+body.dark-mode {
+  /* Dark Mode Variables */
+  --bg-color: #1e1e24;
+  --surface-color: #232329;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  
+  --border-color: rgba(255, 255, 255, 0.05);
+
+  /* Neumorphic Shadows (Dark Mode) */
+  --shadow-light: #2b2b32;
+  --shadow-dark: #1b1b20;
+
+  --neu-flat: 
+    8px 8px 16px var(--shadow-dark), 
+    -8px -8px 16px var(--shadow-light);
+    
+  --neu-pressed: 
+    inset 4px 4px 8px var(--shadow-dark), 
+    inset -4px -4px 8px var(--shadow-light);
+    
+  --neu-elevated: 
+    12px 12px 24px var(--shadow-dark), 
+    -12px -12px 24px var(--shadow-light);
+    
+  --neu-sm: 
+    4px 4px 8px var(--shadow-dark), 
+    -4px -4px 8px var(--shadow-light);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 1.125rem; /* Base font bit big as requested */
+  line-height: 1.6;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button, input, select {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+/* --------------------------------------
+   Neumorphic Utilities
+-------------------------------------- */
+
+.neu-box {
+  background: var(--surface-color);
+  box-shadow: var(--neu-flat);
+  border-radius: 16px;
+  padding: 24px;
+  transition: all var(--transition-speed) ease;
+}
+
+.neu-box:hover {
+  box-shadow: var(--neu-elevated);
+  transform: translateY(-2px);
+}
+
+.neu-card {
+  background: var(--surface-color);
+  box-shadow: var(--neu-sm);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all var(--transition-speed) ease;
+}
+
+.neu-card:hover {
+  box-shadow: var(--neu-flat);
+}
+
+.neu-input {
+  background: var(--bg-color);
+  box-shadow: var(--neu-pressed);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--text-primary);
+  outline: none;
+  width: 100%;
+  transition: all var(--transition-speed) ease;
+}
+
+.neu-input:focus {
+  box-shadow: var(--neu-pressed), 0 0 0 2px var(--primary-color);
+}
+
+.neu-button {
+  background: var(--surface-color);
+  box-shadow: var(--neu-sm);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all var(--transition-speed) ease;
+}
+
+.neu-button:hover {
+  box-shadow: var(--neu-flat);
+}
+
+.neu-button:active {
+  box-shadow: var(--neu-pressed);
+  transform: translateY(1px);
+}
+
+.neu-button.primary {
+  background: var(--primary-color);
+  color: white;
+  box-shadow: 4px 4px 10px rgba(59, 130, 246, 0.4), -2px -2px 5px rgba(255, 255, 255, 0.1);
+}
+.neu-button.primary:hover {
+  background: var(--primary-hover);
+  box-shadow: 6px 6px 12px rgba(59, 130, 246, 0.5), -2px -2px 5px rgba(255, 255, 255, 0.1);
+}
+.neu-button.primary:active {
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.neu-button.danger {
+  background: var(--danger-color);
+  color: white;
+  box-shadow: 4px 4px 10px rgba(239, 68, 68, 0.4), -2px -2px 5px rgba(255, 255, 255, 0.1);
+}
+.neu-button.danger:active {
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* --------------------------------------
+   Typography & Utils
+-------------------------------------- */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-secondary); font-size: 0.9em; }
+
+.fw-bold { font-weight: 700; }
+.fw-semibold { font-weight: 600; }
+
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.gap-2 { gap: 8px; }
+.gap-4 { gap: 16px; }
+.gap-6 { gap: 24px; }
+.gap-8 { gap: 32px; }
+.w-full { width: 100%; }
+.mt-4 { margin-top: 16px; }
+.mt-8 { margin-top: 32px; }
+.mb-4 { margin-bottom: 16px; }
+.p-6 { padding: 24px; }
+
+/* --------------------------------------
+   Badges
+-------------------------------------- */
+.badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-block;
+  box-shadow: var(--neu-sm);
+}
+.badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); }
+.badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); }
+.badge-warning { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); }
+.badge-primary { background: rgba(59, 130, 246, 0.1); color: var(--primary-color); }
+.badge-secondary { background: rgba(100, 116, 139, 0.1); color: var(--text-secondary); }
+
+/* --------------------------------------
+   Tables
+-------------------------------------- */
+.neu-table-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: var(--neu-flat);
+  background: var(--surface-color);
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.neu-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+.neu-table th {
+  text-align: left;
+  padding: 12px 16px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.neu-table td {
+  padding: 16px;
+  background: var(--bg-color);
+  transition: all 0.2s ease;
+}
+
+.neu-table tr td:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.neu-table tr td:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.neu-table tbody tr {
+  box-shadow: var(--neu-sm);
+  cursor: pointer;
+}
+
+.neu-table tbody tr:hover td {
+  background: var(--surface-color);
+  transform: scale(1.005);
+}
+
+/* --------------------------------------
+   Animations
+-------------------------------------- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.animate-delay-1 { animation-delay: 0.1s; }
+.animate-delay-2 { animation-delay: 0.2s; }
+.animate-delay-3 { animation-delay: 0.3s; }
+
+/* --------------------------------------
+   Toggle Switch (Theme)
+-------------------------------------- */
+.theme-switch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.theme-switch {
+  display: inline-block;
+  height: 28px;
+  position: relative;
+  width: 50px;
+}
+
+.theme-switch input {
+  display:none;
+}
+
+.slider {
+  background-color: var(--bg-color);
+  box-shadow: var(--neu-pressed);
+  bottom: 0;
+  cursor: pointer;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  transition: .4s;
+}
+
+.slider:before {
+  background-color: var(--primary-color);
+  box-shadow: var(--neu-sm);
+  bottom: 4px;
+  content: "";
+  height: 20px;
+  left: 4px;
+  position: absolute;
+  transition: .4s;
+  width: 20px;
+}
+
+input:checked + .slider {
+  background-color: var(--bg-color);
+}
+
+input:checked + .slider:before {
+  transform: translateX(22px);
+  background-color: #fff;
+}
+
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
 }
