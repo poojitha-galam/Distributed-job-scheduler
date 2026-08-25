@@ -74,11 +74,12 @@ def get_project_from_api_key(x_api_key: str = Header(None), db: Session = Depend
     return project
 
 
-def require_project_access(project_id: uuid.UUID, user: User | None = None, api_key_project: Project | None = None, db: Session = Depends(get_db)):
+def require_project_access(project_id: uuid.UUID, user: User | None = None, api_key_project: Project | None = None, db: Session = Depends(get_db), require_role: str = None):
     """Verifies that the caller has access to the specified project."""
     if api_key_project:
         if api_key_project.id != project_id:
             raise HTTPException(status_code=403, detail="API Key does not have access to this project")
+        # API Keys currently bypass role checks, or we could add roles to API keys
         return
         
     if user:
@@ -94,6 +95,10 @@ def require_project_access(project_id: uuid.UUID, user: User | None = None, api_
         
         if not member:
             raise HTTPException(status_code=403, detail="User does not have access to this project")
+            
+        if require_role == "admin" and member.role != "admin":
+            raise HTTPException(status_code=403, detail="Admin access required")
+            
         return
         
     raise HTTPException(status_code=401, detail="Authentication required")

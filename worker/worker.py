@@ -136,6 +136,7 @@ class DeadLetterJob(Base):
     first_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payload_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    ai_summary: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
@@ -152,6 +153,24 @@ class JobExecution(Base):
     error: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
+class JobDependency(Base):
+    __tablename__ = "job_dependencies"
+    __table_args__ = {'extend_existing': True}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    depends_on_job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+class EventRule(Base):
+    __tablename__ = "event_rules"
+    __table_args__ = {'extend_existing': True}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    event_type: Mapped[str] = mapped_column(String, nullable=False)
+    webhook_url: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 # ---------------------------------------------------------------------------
 # Job processing
@@ -164,14 +183,39 @@ def compute_delay_seconds(policy: str, attempt: int) -> int:
     if policy == "exponential": return 5 * (2 ** (attempt - 1))
     return 5
 
-def claim_next_job(db: Session, worker_id: str) -> Job | None:
-    """Atomically claim the next QUEUED job using concurrency-aware query.
+import redis
 
-    Respects per-queue concurrency limits and priority ordering.
-    """
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+
+def claim_next_job(db: Session, worker_id: str) -> Job | None:
+    """Pop the next job ID from Redis, then atomically claim it in Postgres."""
     now = datetime.now(timezone.utc)
 
-    # Subquery: count of active (CLAIMED or RUNNING) jobs per queue
+    # For sharding, we could listen to specific queues based on worker_id.
+    # For now, we fetch all active queues and listen to them in priority order.
+    # Note: In a real distributed system, queue names would be cached or 
+    # pushed to workers via PubSub.
+    queues = db.query(Queue).filter(Queue.paused == False).order_by(Queue.priority.desc()).all()
+    if not queues:
+        return None
+        
+    redis_keys = [f"queue:{q.name}" for q in queues]
+    
+    # BRPOP from the highest priority queues first (timeout 2 seconds)
+    popped = redis_client.brpop(redis_keys, timeout=POLL_INTERVAL)
+    if not popped:
+        return None
+        
+    queue_key, job_id_str = popped
+    
+    try:
+        job_id = uuid.UUID(job_id_str)
+    except ValueError:
+        return None
+
+    # We popped a job. Now we must claim it in Postgres.
+    # We still check concurrency limit here to be safe.
     active_count_subq = (
         db.query(func.count(Job.id))
         .filter(Job.queue_id == Queue.id)
@@ -183,27 +227,40 @@ def claim_next_job(db: Session, worker_id: str) -> Job | None:
     job = (
         db.query(Job)
         .join(Queue, Job.queue_id == Queue.id)
+        .filter(Job.id == job_id)
         .filter(Job.status == "QUEUED")
-        .filter((Job.scheduled_at == None) | (Job.scheduled_at <= now))
-        .filter((Job.next_retry_at == None) | (Job.next_retry_at <= now))
-        .filter(Queue.paused == False)
         .filter(active_count_subq < Queue.concurrency_limit)
-        .order_by(Queue.priority.desc(), Job.created_at.asc())
+        .filter(
+            (Job.scheduled_at <= now) | (Job.scheduled_at.is_(None))
+        )
+        .filter(
+            (Job.next_retry_at <= now) | (Job.next_retry_at.is_(None))
+        )
         .with_for_update(of=Job, skip_locked=True)
         .first()
     )
-    if job:
-        job.status = "CLAIMED"
-        job.claimed_by = worker_id
-        job.claim_token = str(uuid.uuid4())
-        job.attempt_count += 1
-        db.commit()
-        queue_name = job.queue.name if job.queue else "unknown"
-        project_name = job.queue.project.name if job.queue and job.queue.project else "unknown"
-        logger.info("[%s] claimed job %s from queue '%s' (project: %s)", worker_id, job.id, queue_name, project_name)
-        return job
-    return None
+    
+    if not job:
+        # Check why it failed. Only push back if it's still QUEUED (e.g. concurrency limit, schedule delay, paused queue)
+        job_check = db.query(Job).filter(Job.id == job_id).first()
+        if job_check and job_check.status == "QUEUED":
+            redis_client.rpush(queue_key, job_id_str)
+            time.sleep(0.1)
+        return None
 
+    job.status = "CLAIMED"
+    job.claimed_by = worker_id
+    job.claim_token = str(uuid.uuid4())
+    job.attempt_count += 1
+    db.commit()
+    
+    queue_name = job.queue.name if job.queue else "unknown"
+    project_name = job.queue.project.name if job.queue and job.queue.project else "unknown"
+    logger.info("[%s] claimed job %s from queue '%s' (project: %s)", worker_id, job.id, queue_name, project_name)
+    return job
+
+
+import json
 
 def process_job(db: Session, job: Job, worker_id: str) -> None:
     """Transition a job from CLAIMED -> RUNNING -> COMPLETED/FAILED."""
@@ -226,6 +283,7 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
     
     db.commit()
     logger.info("Job %s | CLAIMED -> RUNNING (queue '%s')", job.id, queue_name)
+    redis_client.publish("job_updates", json.dumps({"job_id": str(job.id), "status": "RUNNING"}))
 
     # Start heartbeat thread
     import threading
@@ -265,8 +323,40 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
         execution.status = "COMPLETED"
         execution.completed_at = job.completed_at
         
+        # Check for dependent jobs
+        deps = db.query(JobDependency).filter(JobDependency.depends_on_job_id == job.id).all()
+        for dep in deps:
+            dep_job = db.query(Job).filter(Job.id == dep.job_id).first()
+            if dep_job and dep_job.status == "PENDING_DEPENDENCY":
+                # Check if all dependencies are met
+                other_deps = db.query(JobDependency).filter(JobDependency.job_id == dep_job.id).all()
+                all_met = True
+                for od in other_deps:
+                    od_job = db.query(Job).filter(Job.id == od.depends_on_job_id).first()
+                    if not od_job or od_job.status != "COMPLETED":
+                        all_met = False
+                        break
+                
+                if all_met:
+                    dep_job.status = "QUEUED"
+                    redis_client.lpush(f"queue:{dep_job.queue.name if dep_job.queue else 'default'}", str(dep_job.id))
+                    logger.info("Job %s | Dependency met, pushing to Redis", dep_job.id)
+                    redis_client.publish("job_updates", json.dumps({"job_id": str(dep_job.id), "status": "QUEUED"}))
+        
         db.commit()
         logger.info("Job %s | RUNNING -> COMPLETED (queue '%s')", job.id, queue_name)
+        redis_client.publish("job_updates", json.dumps({"job_id": str(job.id), "status": "COMPLETED"}))
+
+        # Check for EventRules
+        if job.queue and job.queue.project_id:
+            rules = db.query(EventRule).filter(EventRule.project_id == job.queue.project_id, EventRule.event_type == "JOB_COMPLETED").all()
+            if rules:
+                import requests
+                for rule in rules:
+                    try:
+                        requests.post(rule.webhook_url, json={"job_id": str(job.id), "status": "COMPLETED", "result": result}, timeout=2)
+                    except:
+                        pass
 
     except Exception as exc:
         if job.attempt_count >= job.max_attempts:
@@ -281,6 +371,7 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
             
             db.commit()
             logger.error("Job %s | RUNNING -> FAILED (max attempts) | %s", job.id, exc)
+            redis_client.publish("job_updates", json.dumps({"job_id": str(job.id), "status": "FAILED"}))
             
             # Try to create DLQ entry (may fail if already exists from a previous cycle)
             try:
@@ -298,6 +389,17 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
             except Exception as dlq_exc:
                 db.rollback()
                 logger.warning("Job %s | DLQ insert skipped (already exists?): %s", job.id, dlq_exc)
+                
+            # Check for EventRules
+            if job.queue and job.queue.project_id:
+                rules = db.query(EventRule).filter(EventRule.project_id == job.queue.project_id, EventRule.event_type == "JOB_FAILED").all()
+                if rules:
+                    import requests
+                    for rule in rules:
+                        try:
+                            requests.post(rule.webhook_url, json={"job_id": str(job.id), "status": "FAILED", "error": str(exc)}, timeout=2)
+                        except:
+                            pass
         else:
             # Retry
             delay = compute_delay_seconds(job.retry_policy, job.attempt_count)
@@ -311,6 +413,14 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
             execution.error = str(exc)
             
             db.commit()
+            redis_client.publish("job_updates", json.dumps({"job_id": str(job.id), "status": "QUEUED"}))
+            
+            # For a real delayed retry queue, we'd use a sorted set or send it back to the scheduler.
+            # To keep it simple, we push it to Redis, but it will be picked up immediately.
+            # Since the `claim_next_job` filters `next_retry_at <= now`, the worker will fail to claim it
+            # and push it back, essentially busy-waiting it. 
+            # Better approach: We don't push it to Redis here. The `scheduler.py` can be modified to 
+            # poll for Jobs where `status == QUEUED` and `next_retry_at <= now` and push them to Redis!
             logger.warning("Job %s | RUNNING -> QUEUED (Retry in %ds) | %s", job.id, delay, exc)
     finally:
         done_event.set()

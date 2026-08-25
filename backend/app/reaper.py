@@ -39,6 +39,10 @@ def reap_stale_jobs():
                 job.error = exc_msg
                 db.commit()
                 logger.error("Job %s | STALE RUNNING -> FAILED (max attempts)", job.id)
+                import os, redis, json
+                REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+                r = redis.from_url(REDIS_URL, decode_responses=True)
+                r.publish("job_updates", json.dumps({"job_id": str(job.id), "status": "FAILED"}))
                 
                 # Try DLQ insert separately
                 try:
@@ -64,6 +68,10 @@ def reap_stale_jobs():
                 job.last_error = exc_msg
                 job.claimed_by = None
                 db.commit()
+                import os, redis, json
+                REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+                r = redis.from_url(REDIS_URL, decode_responses=True)
+                r.publish("job_updates", json.dumps({"job_id": str(job.id), "status": "QUEUED"}))
                 logger.warning("Job %s | STALE RUNNING -> QUEUED (Retry in %ds)", job.id, delay)
 
     except Exception as e:
@@ -75,8 +83,15 @@ def reap_stale_jobs():
 if __name__ == "__main__":
     logger.info("Starting reaper service...")
     while True:
+        import redis, os
+        REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        r = redis.from_url(REDIS_URL, decode_responses=True)
         try:
-            reap_stale_jobs()
+            lock = r.set("lock:reaper", "1", nx=True, ex=30)
+            if lock:
+                reap_stale_jobs()
+            else:
+                logger.debug("Reaper lock held by another instance. Skipping tick.")
         except Exception as e:
             logger.error("Reaper outer error: %s", e)
         time.sleep(10)

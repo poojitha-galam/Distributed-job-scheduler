@@ -3,12 +3,14 @@ from uuid import UUID
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Job, Queue
 from ..schemas import JobCreate, JobResponse, JobExecutionResponse, PaginatedResponse
 from ..auth import resolve_project
+from ..rate_limit import rate_limiter
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -29,9 +31,10 @@ def _job_to_response(job: Job) -> JobResponse:
     return JobResponse(**data)
 
 
-@router.post("/", response_model=JobResponse, status_code=201)
-def create_job(body: JobCreate, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
-    """Create a new job. It starts in QUEUED status."""
+@router.post("/", response_model=JobResponse, status_code=201, dependencies=[Depends(rate_limiter)])
+async def create_job(body: JobCreate, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+    """Create a new job. It starts in QUEUED status and is pushed to Redis."""
+    from ..redis import get_redis
     queue = _resolve_queue(db, body.queue_name, project_id)
     job = Job(
         name=body.name,
@@ -44,10 +47,20 @@ def create_job(body: JobCreate, project_id: UUID = Depends(resolve_project), db:
     db.add(job)
     db.commit()
     db.refresh(job)
+    
+    # Push to Redis
+    if not job.scheduled_at or job.scheduled_at <= datetime.now(job.scheduled_at.tzinfo if job.scheduled_at.tzinfo else None):
+        job.claimed_by = "redis"
+        db.commit()
+        db.refresh(job)
+        
+        redis = await get_redis()
+        await redis.lpush(f"queue:{queue.name}", str(job.id))
+        
     return _job_to_response(job)
 
-@router.post("/scheduled", response_model=JobResponse, status_code=201)
-def create_scheduled_job(body: JobCreate, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+@router.post("/scheduled/", response_model=JobResponse, status_code=201, dependencies=[Depends(rate_limiter)])
+async def create_scheduled_job(body: JobCreate, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
     """Create a new scheduled or delayed job."""
     if not body.scheduled_at:
         raise HTTPException(status_code=400, detail="scheduled_at is required for scheduled jobs")
@@ -64,6 +77,34 @@ def create_scheduled_job(body: JobCreate, project_id: UUID = Depends(resolve_pro
     db.commit()
     db.refresh(job)
     return _job_to_response(job)
+
+class JobDependencyCreate(BaseModel):
+    depends_on_job_id: UUID
+
+@router.post("/{job_id}/dependencies", status_code=201)
+def add_job_dependency(
+    job_id: UUID, 
+    body: JobDependencyCreate, 
+    project_id: UUID = Depends(resolve_project), 
+    db: Session = Depends(get_db)
+):
+    from ..models import JobDependency
+    # Verify jobs exist
+    job = db.query(Job).join(Queue).filter(Job.id == job_id, Queue.project_id == project_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    depends_on_job = db.query(Job).join(Queue).filter(Job.id == body.depends_on_job_id, Queue.project_id == project_id).first()
+    if not depends_on_job:
+        raise HTTPException(status_code=404, detail="Dependency Job not found")
+        
+    # Put job in PENDING_DEPENDENCY state
+    job.status = "PENDING_DEPENDENCY"
+    
+    dep = JobDependency(job_id=job.id, depends_on_job_id=depends_on_job.id)
+    db.add(dep)
+    db.commit()
+    return {"status": "ok"}
 
 
 @router.get("/", response_model=PaginatedResponse[JobResponse])

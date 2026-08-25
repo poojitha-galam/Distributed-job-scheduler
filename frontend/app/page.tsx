@@ -129,8 +129,30 @@ export default function Home() {
       return;
     }
     fetchData();
-    const id = setInterval(fetchData, 2000);
-    return () => clearInterval(id);
+    
+    // Connect to WebSocket for live updates
+    const wsUrl = process.env.NEXT_PUBLIC_API_URL?.replace("http", "ws") || "ws://localhost:8000";
+    const ws = new WebSocket(`${wsUrl}/api/v1/ws/dashboard`);
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.job_id && data.status) {
+          // Update the specific job in state to avoid full refetch if possible,
+          // but for now, just trigger a quick refetch to keep it simple and accurate
+          fetchData();
+        }
+      } catch (e) {
+        console.error("WS error:", e);
+      }
+    };
+    
+    // Fallback polling
+    const id = setInterval(fetchData, 10000);
+    return () => {
+      clearInterval(id);
+      ws.close();
+    };
   }, [fetchData]);
 
   async function handleSubmit(e: React.FormEvent) {

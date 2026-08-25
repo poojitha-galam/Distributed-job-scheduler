@@ -140,6 +140,7 @@ class DeadLetterJob(Base):
     first_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payload_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    ai_summary: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
@@ -194,4 +195,19 @@ class JobExecution(Base):
     # Relationships
     job = relationship("Job")
 
+class JobDependency(Base):
+    __tablename__ = "job_dependencies"
 
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=False, index=True)
+    depends_on_job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+class EventRule(Base):
+    __tablename__ = "event_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String, nullable=False) # e.g. "JOB_COMPLETED", "JOB_FAILED"
+    webhook_url: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))

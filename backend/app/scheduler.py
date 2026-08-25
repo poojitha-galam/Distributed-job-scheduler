@@ -58,6 +58,14 @@ def process_due_schedules():
                 db.commit()
                 logger.info("[scheduler] created job %s", job.id)
                 logger.info("[scheduler] next run for schedule %s = %s", schedule.id, next_run)
+                
+                # Push to Redis
+                import redis
+                import os
+                REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+                r = redis.from_url(REDIS_URL, decode_responses=True)
+                queue_name = schedule.queue.name if schedule.queue else "default"
+                r.lpush(f"queue:{queue_name}", str(job.id))
             except IntegrityError:
                 # Unique constraint violation: duplicate execution already created!
                 db.rollback()
@@ -76,11 +84,62 @@ def process_due_schedules():
     finally:
         db.close()
 
+def process_delayed_jobs():
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        import redis
+        import os
+        REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        r = redis.from_url(REDIS_URL, decode_responses=True)
+        
+        while True:
+            job = (
+                db.query(Job)
+                .filter(Job.status == "QUEUED")
+                .filter(
+                    (Job.claimed_by != "redis") | (Job.claimed_by == None)
+                )
+                .filter(
+                    (Job.scheduled_at <= now) | (Job.next_retry_at <= now)
+                )
+                .with_for_update(skip_locked=True)
+                .first()
+            )
+            
+            if not job:
+                break
+                
+            job.claimed_by = "redis"
+            queue_name = job.queue.name if job.queue else "default"
+            db.commit()
+            r.lpush(f"queue:{queue_name}", str(job.id))
+            logger.info("[scheduler] Pushed delayed/retry job %s to Redis", job.id)
+    except Exception as e:
+        db.rollback()
+        logger.error("[scheduler] error in delayed jobs: %s", e)
+    finally:
+        db.close()
+
 if __name__ == "__main__":
     logger.info("Starting scheduler service...")
     while True:
+        import redis
+        import os
+        REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        r = redis.from_url(REDIS_URL, decode_responses=True)
+        
         try:
-            process_due_schedules()
+            # Try to acquire lock, expiring in 5 seconds
+            lock = r.set("lock:scheduler", "1", nx=True, ex=5)
+            if lock:
+                logger.info("Scheduler lock acquired, processing...")
+                process_due_schedules()
+                logger.info("Finished due schedules, starting delayed jobs...")
+                process_delayed_jobs()
+                logger.info("Finished delayed jobs, tick complete.")
+            else:
+                pass
         except Exception as e:
             logger.error("Scheduler outer error: %s", e)
         time.sleep(1)
