@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Queue, Job
 from ..schemas import QueueCreate, QueueUpdate, QueueResponse, QueueStatsResponse, PaginatedResponse
-from ..auth import resolve_project
+from ..auth import resolve_project, resolve_project_admin
 
 router = APIRouter(prefix="/queues", tags=["queues"])
 
@@ -47,7 +47,7 @@ def _queue_to_response(db: Session, queue: Queue) -> QueueResponse:
 
 
 @router.post("/", response_model=QueueResponse, status_code=201)
-def create_queue(body: QueueCreate, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def create_queue(body: QueueCreate, project_id: UUID = Depends(resolve_project_admin), db: Session = Depends(get_db)):
     existing = db.query(Queue).filter(Queue.name == body.name, Queue.project_id == project_id).first()
     if existing:
         raise HTTPException(status_code=409, detail=f"Queue '{body.name}' already exists")
@@ -92,7 +92,7 @@ def get_queue(queue_id: UUID, project_id: UUID = Depends(resolve_project), db: S
 
 
 @router.patch("/{queue_id}", response_model=QueueResponse)
-def update_queue(queue_id: UUID, body: QueueUpdate, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def update_queue(queue_id: UUID, body: QueueUpdate, project_id: UUID = Depends(resolve_project_admin), db: Session = Depends(get_db)):
     queue = db.query(Queue).filter(Queue.id == queue_id, Queue.project_id == project_id).first()
     if not queue:
         raise HTTPException(status_code=404, detail="Queue not found")
@@ -112,7 +112,7 @@ def update_queue(queue_id: UUID, body: QueueUpdate, project_id: UUID = Depends(r
 
 
 @router.post("/{queue_id}/pause", response_model=QueueResponse)
-def pause_queue(queue_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def pause_queue(queue_id: UUID, project_id: UUID = Depends(resolve_project_admin), db: Session = Depends(get_db)):
     queue = db.query(Queue).filter(Queue.id == queue_id, Queue.project_id == project_id).first()
     if not queue:
         raise HTTPException(status_code=404, detail="Queue not found")
@@ -124,7 +124,7 @@ def pause_queue(queue_id: UUID, project_id: UUID = Depends(resolve_project), db:
 
 
 @router.post("/{queue_id}/resume", response_model=QueueResponse)
-def resume_queue(queue_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def resume_queue(queue_id: UUID, project_id: UUID = Depends(resolve_project_admin), db: Session = Depends(get_db)):
     queue = db.query(Queue).filter(Queue.id == queue_id, Queue.project_id == project_id).first()
     if not queue:
         raise HTTPException(status_code=404, detail="Queue not found")
@@ -136,7 +136,7 @@ def resume_queue(queue_id: UUID, project_id: UUID = Depends(resolve_project), db
 
 
 @router.delete("/{queue_id}", status_code=204)
-def delete_queue(queue_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def delete_queue(queue_id: UUID, project_id: UUID = Depends(resolve_project_admin), db: Session = Depends(get_db)):
     queue = db.query(Queue).filter(Queue.id == queue_id, Queue.project_id == project_id).first()
     if not queue:
         raise HTTPException(status_code=404, detail="Queue not found")

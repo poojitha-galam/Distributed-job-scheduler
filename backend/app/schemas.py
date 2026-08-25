@@ -17,6 +17,7 @@ class JobCreate(BaseModel):
     payload: dict
     scheduled_at: datetime | None = None
     queue_name: str | None = None
+    idempotency_key: str | None = None
 
 
 class JobResponse(BaseModel):
@@ -34,14 +35,16 @@ class JobResponse(BaseModel):
     next_retry_at: datetime | None = None
     result: Any | None = None
     error: str | None = None
+    ai_summary: dict | None = None
     scheduled_at: datetime | None = None
     is_recurring: bool = False
     cron_expression: str | None = None
     next_run_at: datetime | None = None
+    queue_name: str | None = None
+    idempotency_key: str | None = None
     schedule_id: UUID | None = None
     parent_job_id: UUID | None = None
     queue_id: UUID | None = None
-    queue_name: str | None = None
     created_at: datetime
     started_at: datetime | None = None
     completed_at: datetime | None = None
@@ -126,5 +129,19 @@ class QueueResponse(BaseModel):
     stats: QueueStatsResponse = QueueStatsResponse()
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class JobLogCreate(BaseModel):
+    message: str
+    level: str = "INFO"
+
+class JobLogResponse(BaseModel):
+    id: UUID
+    job_id: UUID
+    timestamp: datetime
+    message: str
+    level: str
 
     model_config = {"from_attributes": True}

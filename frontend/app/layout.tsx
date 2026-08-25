@@ -37,7 +37,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body style={{ fontFamily: "'Inter', sans-serif" }}>
+      <body className="bg-grid-slate-100 dark:bg-grid-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

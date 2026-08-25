@@ -1,7 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
+from datetime import datetime, timezone
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import engine, Base
@@ -70,6 +72,33 @@ async def log_requests(request: Request, call_next):
     process_time_ms = (time.time() - start_time) * 1000
     logger.info(f"method={request.method} path={request.url.path} status_code={response.status_code} processing_time_ms={process_time_ms:.2f}")
     return response
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": exc.status_code,
+            "error": "HTTP Exception",
+            "message": exc.detail,
+            "path": request.url.path
+        },
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": 500,
+            "error": "Internal Server Error",
+            "message": str(exc),
+            "path": request.url.path
+        },
+    )
 
 app.include_router(jobs.router, prefix="/api/v1")
 app.include_router(dlq.router, prefix="/api/v1")

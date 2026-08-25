@@ -4,18 +4,47 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased min-h-screen transition-colors duration-200;
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased min-h-screen transition-colors duration-200 selection:bg-blue-500/30;
   }
 }
 
 @layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 dark:bg-slate-900/50 dark:border-slate-800/50 shadow-sm;
+  }
+  
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-xl border border-slate-200/60 dark:bg-slate-900/60 dark:border-slate-800/60 shadow-sm transition-all duration-300 hover:shadow-md;
+  }
+  
   .glow-green {
-    box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
   }
   .glow-blue {
-    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
   }
   .glow-red {
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
   }
+
+  /* Premium grid background for dark mode */
+  .bg-grid-slate-900 {
+    background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm1 1h38v38H1V1z' fill='%231e293b' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E");
+  }
+
+  .bg-grid-slate-100 {
+    background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm1 1h38v38H1V1z' fill='%23f1f5f9' fill-opacity='0.5' fill-rule='evenodd'/%3E%3C/svg%3E");
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-slate-300/50 dark:bg-slate-700/50 hover:bg-slate-400/50 dark:hover:bg-slate-600/50 transition-colors;
 }

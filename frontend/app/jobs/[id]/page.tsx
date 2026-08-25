@@ -31,16 +31,16 @@ interface Job {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  QUEUED: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  CLAIMED: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-  RUNNING: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  COMPLETED: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
-  FAILED: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
+  QUEUED: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700/50 border",
+  CLAIMED: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800/30 border",
+  RUNNING: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800/30 border",
+  COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/30 border",
+  FAILED: "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/30 border",
 };
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide ${STATUS_STYLES[status] ?? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>
+    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold tracking-widest uppercase ${STATUS_STYLES[status] ?? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>
       {status}
     </span>
   );
@@ -117,50 +117,58 @@ export default function JobDetailPage() {
           </Link>
         </div>
         
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="mb-8 border-b border-slate-200 pb-6 dark:border-slate-800">
-            <h1 className="mb-4 text-2xl font-bold text-slate-900 dark:text-slate-100">Job: <span className="font-mono">{job.name}</span></h1>
-            <div className="flex flex-wrap gap-x-8 gap-y-4 text-sm text-slate-600 dark:text-slate-400">
-              <div className="flex flex-col gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-500">Status</span> <div><StatusBadge status={job.status} /></div></div>
-              <div className="flex flex-col gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-500">Queue</span> <span className="font-medium text-slate-900 dark:text-slate-200">{job.queue_name || "\u2014"}</span></div>
-              <div className="flex flex-col gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-500">Worker</span> <span className="font-mono">{job.claimed_by || "\u2014"}</span></div>
+        <div className="rounded-2xl glass-card p-8">
+          <div className="mb-8 border-b border-slate-200/60 pb-6 dark:border-slate-800/60">
+            <h1 className="mb-4 text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-lg glow-blue">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              </span>
+              Job: <span className="font-mono text-indigo-600 dark:text-indigo-400">{job.name}</span>
+            </h1>
+            <div className="flex flex-wrap gap-x-8 gap-y-4 text-sm text-slate-600 dark:text-slate-400 pl-11">
+              <div className="flex flex-col gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Status</span> <div><StatusBadge status={job.status} /></div></div>
+              <div className="flex flex-col gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Queue</span> <span className="font-medium text-slate-900 dark:text-slate-200">{job.queue_name || "\u2014"}</span></div>
+              <div className="flex flex-col gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Worker</span> <span className="font-mono">{job.claimed_by || "\u2014"}</span></div>
             </div>
           </div>
           
           <div className="grid gap-8 sm:grid-cols-2">
             <div>
-              <h2 className="mb-4 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-widest text-slate-500 dark:border-slate-800 dark:text-slate-400">Timeline</h2>
+              <h2 className="mb-4 border-b border-slate-200/60 pb-2 text-sm font-bold uppercase tracking-widest text-slate-500 dark:border-slate-800/60">Timeline</h2>
               <dl className="flex flex-col gap-3 text-sm">
-                <div className="flex justify-between border-b border-slate-100 pb-3 dark:border-slate-800/50"><dt className="text-slate-500 dark:text-slate-400">Created</dt><dd className="font-medium text-slate-900 dark:text-slate-200">{fmtDate(job.created_at)}</dd></div>
-                <div className="flex justify-between border-b border-slate-100 pb-3 dark:border-slate-800/50"><dt className="text-slate-500 dark:text-slate-400">Started</dt><dd className="font-medium text-slate-900 dark:text-slate-200">{fmtDate(job.started_at)}</dd></div>
-                <div className="flex justify-between pb-3"><dt className="text-slate-500 dark:text-slate-400">Completed</dt><dd className="font-medium text-slate-900 dark:text-slate-200">{fmtDate(job.completed_at)}</dd></div>
+                <div className="flex justify-between border-b border-slate-100/50 pb-3 dark:border-slate-800/30"><dt className="text-slate-500 dark:text-slate-400 font-medium">Created</dt><dd className="font-semibold text-slate-900 dark:text-slate-200">{fmtDate(job.created_at)}</dd></div>
+                <div className="flex justify-between border-b border-slate-100/50 pb-3 dark:border-slate-800/30"><dt className="text-slate-500 dark:text-slate-400 font-medium">Started</dt><dd className="font-semibold text-slate-900 dark:text-slate-200">{fmtDate(job.started_at)}</dd></div>
+                <div className="flex justify-between pb-3"><dt className="text-slate-500 dark:text-slate-400 font-medium">Completed</dt><dd className="font-semibold text-slate-900 dark:text-slate-200">{fmtDate(job.completed_at)}</dd></div>
               </dl>
             </div>
             
             <div>
-              <h2 className="mb-4 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-widest text-slate-500 dark:border-slate-800 dark:text-slate-400">Execution</h2>
+              <h2 className="mb-4 border-b border-slate-200/60 pb-2 text-sm font-bold uppercase tracking-widest text-slate-500 dark:border-slate-800/60">Execution</h2>
               <dl className="flex flex-col gap-3 text-sm">
-                <div className="flex justify-between border-b border-slate-100 pb-3 dark:border-slate-800/50"><dt className="text-slate-500 dark:text-slate-400">Attempts</dt><dd className="font-medium text-slate-900 dark:text-slate-200">{job.attempt_count} / {job.max_attempts} (max)</dd></div>
-                <div className="flex justify-between pb-3"><dt className="text-slate-500 dark:text-slate-400">Retry Policy</dt><dd className="font-medium text-slate-900 dark:text-slate-200">{job.retry_policy}</dd></div>
+                <div className="flex justify-between border-b border-slate-100/50 pb-3 dark:border-slate-800/30"><dt className="text-slate-500 dark:text-slate-400 font-medium">Attempts</dt><dd className="font-semibold text-slate-900 dark:text-slate-200">{job.attempt_count} / {job.max_attempts} (max)</dd></div>
+                <div className="flex justify-between pb-3"><dt className="text-slate-500 dark:text-slate-400 font-medium">Retry Policy</dt><dd className="font-semibold text-slate-900 dark:text-slate-200">{job.retry_policy}</dd></div>
               </dl>
             </div>
           </div>
           
           {(job.last_error || job.error) && (
-            <div className="mt-8 rounded-lg border border-red-200 bg-red-50 p-5 dark:border-red-900/30 dark:bg-red-950/20">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-red-600 dark:text-red-500">Last Error</h2>
-              <pre className="overflow-auto whitespace-pre-wrap rounded bg-white p-4 font-mono text-xs text-red-600 shadow-sm dark:bg-slate-950 dark:text-red-400">
+            <div className="mt-8 rounded-xl border border-red-200/50 bg-red-50/50 p-6 dark:border-red-900/30 dark:bg-red-950/20">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-red-600 dark:text-red-500">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                Last Error
+              </h2>
+              <pre className="overflow-auto whitespace-pre-wrap rounded-lg bg-white/80 p-4 font-mono text-xs font-medium text-red-700 shadow-sm dark:bg-slate-950/50 dark:text-red-400">
                 {job.error || job.last_error}
               </pre>
             </div>
           )}
           
           {job.status === "FAILED" && (
-            <div className="mt-8 border-t border-slate-200 pt-6 dark:border-slate-800">
+            <div className="mt-8 border-t border-slate-200/60 pt-6 dark:border-slate-800/60">
               <button 
                 onClick={handleRetry} 
                 disabled={retrying}
-                className="rounded-md bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-50"
+                className="rounded-xl bg-blue-600 px-8 py-3 text-sm font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-xl disabled:transform-none disabled:opacity-50 glow-blue"
               >
                 {retrying ? "Retrying..." : "Retry Job"}
               </button>

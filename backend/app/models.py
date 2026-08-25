@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Boolean, Index, UniqueConstraint
+from sqlalchemy import String, DateTime, Integer, ForeignKey, Boolean, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -88,8 +88,9 @@ class Job(Base):
         UniqueConstraint('schedule_id', 'scheduled_at', name='uq_job_schedule_time'),
         Index('ix_jobs_scheduled_at', 'scheduled_at'),
         Index('ix_jobs_next_run_at', 'next_run_at'),
-        Index('ix_jobs_status', 'status'),
+        Index('ix_jobs_status', 'status', postgresql_where=text("status = 'QUEUED'")),
         Index('ix_jobs_queue_id', 'queue_id'),
+        UniqueConstraint('queue_id', 'idempotency_key', name='uq_queue_idempotency'),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -108,6 +109,7 @@ class Job(Base):
     next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
+    ai_summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
     cron_expression: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -115,6 +117,7 @@ class Job(Base):
     schedule_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("scheduled_jobs.id"), nullable=True)
     parent_job_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     queue_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("queues.id"), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
@@ -211,3 +214,12 @@ class EventRule(Base):
     event_type: Mapped[str] = mapped_column(String, nullable=False) # e.g. "JOB_COMPLETED", "JOB_FAILED"
     webhook_url: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+class JobLog(Base):
+    __tablename__ = "job_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    message: Mapped[str] = mapped_column(String, nullable=False)
+    level: Mapped[str] = mapped_column(String, nullable=False, default="INFO")

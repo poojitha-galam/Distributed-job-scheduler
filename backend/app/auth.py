@@ -74,16 +74,21 @@ def get_project_from_api_key(x_api_key: str = Header(None), db: Session = Depend
     return project
 
 
+ROLE_HIERARCHY = {
+    "viewer": 1,
+    "member": 2,
+    "admin": 3,
+    "owner": 4
+}
+
 def require_project_access(project_id: uuid.UUID, user: User | None = None, api_key_project: Project | None = None, db: Session = Depends(get_db), require_role: str = None):
     """Verifies that the caller has access to the specified project."""
     if api_key_project:
         if api_key_project.id != project_id:
             raise HTTPException(status_code=403, detail="API Key does not have access to this project")
-        # API Keys currently bypass role checks, or we could add roles to API keys
         return
         
     if user:
-        # Check if user is in the project's organization
         project = db.query(Project).filter(Project.id == project_id).first()
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -96,8 +101,11 @@ def require_project_access(project_id: uuid.UUID, user: User | None = None, api_
         if not member:
             raise HTTPException(status_code=403, detail="User does not have access to this project")
             
-        if require_role == "admin" and member.role != "admin":
-            raise HTTPException(status_code=403, detail="Admin access required")
+        if require_role:
+            req_level = ROLE_HIERARCHY.get(require_role.lower(), 0)
+            user_level = ROLE_HIERARCHY.get(member.role.lower(), 0)
+            if user_level < req_level:
+                raise HTTPException(status_code=403, detail=f"{require_role} access required")
             
         return
         
@@ -124,19 +132,28 @@ def get_optional_auth(
 
 from fastapi import Query
 
-def resolve_project(
-    project_id: uuid.UUID = Query(None),
-    auth_entity: User | Project = Depends(get_optional_auth),
-    db: Session = Depends(get_db)
-) -> uuid.UUID:
-    """Returns the resolved project_id. Infers from API key if present, otherwise requires query param and verifies User access."""
-    if isinstance(auth_entity, Project):
-        if project_id and project_id != auth_entity.id:
-            raise HTTPException(status_code=403, detail="API Key cannot access this project")
-        return auth_entity.id
-        
-    if not project_id:
-        raise HTTPException(status_code=400, detail="project_id query parameter is required")
-        
-    require_project_access(project_id, user=auth_entity, db=db)
-    return project_id
+class RequireRole:
+    def __init__(self, role: str = None):
+        self.role = role
+
+    def __call__(
+        self,
+        project_id: uuid.UUID = Query(None),
+        auth_entity: User | Project = Depends(get_optional_auth),
+        db: Session = Depends(get_db)
+    ) -> uuid.UUID:
+        """Returns the resolved project_id. Infers from API key if present, otherwise requires query param and verifies User access."""
+        if isinstance(auth_entity, Project):
+            if project_id and project_id != auth_entity.id:
+                raise HTTPException(status_code=403, detail="API Key cannot access this project")
+            return auth_entity.id
+            
+        if not project_id:
+            raise HTTPException(status_code=400, detail="project_id query parameter is required")
+            
+        require_project_access(project_id, user=auth_entity, db=db, require_role=self.role)
+        return project_id
+
+resolve_project = RequireRole()
+resolve_project_admin = RequireRole("admin")
+resolve_project_member = RequireRole("member")

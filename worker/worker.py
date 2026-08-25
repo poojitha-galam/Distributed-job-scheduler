@@ -105,6 +105,7 @@ class Job(Base):
     next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
+    ai_summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
     cron_expression: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -261,6 +262,65 @@ def claim_next_job(db: Session, worker_id: str) -> Job | None:
 
 
 import json
+import re
+
+def diagnose_failure(error_trace: str) -> dict:
+    """Diagnose job failure using LLM, or fallback to regex."""
+    api_key = os.getenv("GROQ_API_KEY")
+    fallback_used = False
+    diagnosis = None
+    prompt = f"Analyze the following job failure:\n{error_trace}\n\nReturn exactly a JSON object with these 4 keys: 'severity' (string: low/medium/high/critical), 'transience' (string: transient/permanent), 'root_cause' (string: brief explanation), 'suggested_fix' (string: how to fix it)."
+
+    if api_key:
+        try:
+            import requests
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": "openai/gpt-oss-20b",
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"}
+            }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data, timeout=10)
+            resp.raise_for_status()
+            
+            # The model responds with JSON
+            result_text = resp.json()["choices"][0]["message"]["content"]
+            parsed = json.loads(result_text)
+            
+            diagnosis = {
+                "severity": parsed.get("severity", "medium"),
+                "transience": parsed.get("transience", "permanent"),
+                "root_cause": parsed.get("root_cause", "Unknown"),
+                "suggested_fix": parsed.get("suggested_fix", "None provided.")
+            }
+        except Exception as e:
+            logger.error("LLM diagnosis failed, using fallback: %s", e)
+            fallback_used = True
+    else:
+        logger.warning("GROQ_API_KEY missing, using fallback diagnosis.")
+        fallback_used = True
+
+    if fallback_used or not diagnosis:
+        # Regex Fallback
+        diagnosis = {
+            "severity": "medium",
+            "transience": "permanent",
+            "root_cause": "Unknown error",
+            "suggested_fix": "Inspect the error trace manually."
+        }
+        if re.search(r'Timeout|ConnectionError|ConnectionRefused', error_trace, re.I):
+            diagnosis.update({"severity": "high", "transience": "transient", "root_cause": "Network or service timeout", "suggested_fix": "Retry the job or check network connectivity."})
+        elif re.search(r'IntegrityError|KeyError|ValueError', error_trace, re.I):
+            diagnosis.update({"severity": "high", "transience": "permanent", "root_cause": "Data constraint or validation error", "suggested_fix": "Fix the job payload or check database constraints."})
+        elif re.search(r'SyntaxError|ModuleNotFoundError', error_trace, re.I):
+            diagnosis.update({"severity": "critical", "transience": "permanent", "root_cause": "Code issue (Syntax or missing dependency)", "suggested_fix": "Fix the worker code and redeploy."})
+        
+        diagnosis["fallback_used"] = True
+
+    return diagnosis
 
 def process_job(db: Session, job: Job, worker_id: str) -> None:
     """Transition a job from CLAIMED -> RUNNING -> COMPLETED/FAILED."""
@@ -364,6 +424,7 @@ def process_job(db: Session, job: Job, worker_id: str) -> None:
             job.status = "FAILED"
             job.completed_at = datetime.now(timezone.utc)
             job.error = str(exc)
+            job.ai_summary = diagnose_failure(str(exc))
             
             execution.status = "FAILED"
             execution.completed_at = job.completed_at

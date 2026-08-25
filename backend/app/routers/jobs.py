@@ -4,12 +4,13 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+import sqlalchemy
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Job, Queue
-from ..schemas import JobCreate, JobResponse, JobExecutionResponse, PaginatedResponse
-from ..auth import resolve_project
+from ..models import Job, Queue, JobLog
+from ..schemas import JobCreate, JobResponse, JobExecutionResponse, PaginatedResponse, JobLogCreate, JobLogResponse
+from ..auth import resolve_project, resolve_project_member
 from ..rate_limit import rate_limiter
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -32,7 +33,7 @@ def _job_to_response(job: Job) -> JobResponse:
 
 
 @router.post("/", response_model=JobResponse, status_code=201, dependencies=[Depends(rate_limiter)])
-async def create_job(body: JobCreate, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+async def create_job(body: JobCreate, project_id: UUID = Depends(resolve_project_member), db: Session = Depends(get_db)):
     """Create a new job. It starts in QUEUED status and is pushed to Redis."""
     from ..redis import get_redis
     queue = _resolve_queue(db, body.queue_name, project_id)
@@ -43,9 +44,17 @@ async def create_job(body: JobCreate, project_id: UUID = Depends(resolve_project
         queue_id=queue.id,
         max_attempts=queue.max_attempts,
         retry_policy=queue.retry_policy,
+        idempotency_key=body.idempotency_key,
     )
     db.add(job)
-    db.commit()
+    try:
+        db.commit()
+    except sqlalchemy.exc.IntegrityError:
+        db.rollback()
+        existing_job = db.query(Job).filter(Job.queue_id == queue.id, Job.idempotency_key == body.idempotency_key).first()
+        if existing_job:
+            return _job_to_response(existing_job)
+        raise HTTPException(status_code=400, detail="Integrity error when creating job")
     db.refresh(job)
     
     # Push to Redis
@@ -59,8 +68,54 @@ async def create_job(body: JobCreate, project_id: UUID = Depends(resolve_project
         
     return _job_to_response(job)
 
+
+from typing import List
+
+@router.post("/batch", response_model=List[UUID], status_code=201, dependencies=[Depends(rate_limiter)])
+async def create_batch_jobs(jobs_in: List[JobCreate], project_id: UUID = Depends(resolve_project_member), db: Session = Depends(get_db)):
+    """Create a batch of new jobs."""
+    from ..redis import get_redis
+    
+    queues_map = {}
+    db_jobs = []
+    
+    for body in jobs_in:
+        q_name = body.queue_name or "default"
+        if q_name not in queues_map:
+            queues_map[q_name] = _resolve_queue(db, q_name, project_id)
+        
+        queue = queues_map[q_name]
+        job = Job(
+            name=body.name,
+            payload=body.payload,
+            scheduled_at=body.scheduled_at,
+            queue_id=queue.id,
+            max_attempts=queue.max_attempts,
+            retry_policy=queue.retry_policy,
+            idempotency_key=body.idempotency_key,
+        )
+        db_jobs.append((job, q_name))
+        
+    # Python UUIDs are generated immediately since we set default=uuid4
+    jobs_to_add = [j[0] for j in db_jobs]
+    db.add_all(jobs_to_add)
+    db.commit()
+    
+    redis = None
+    for job, q_name in db_jobs:
+        if not job.scheduled_at or job.scheduled_at <= datetime.now(job.scheduled_at.tzinfo if job.scheduled_at.tzinfo else None):
+            job.claimed_by = "redis"
+            if redis is None:
+                redis = await get_redis()
+            await redis.lpush(f"queue:{q_name}", str(job.id))
+            
+    if redis:
+        db.commit()
+        
+    return [job.id for job, _ in db_jobs]
+
 @router.post("/scheduled/", response_model=JobResponse, status_code=201, dependencies=[Depends(rate_limiter)])
-async def create_scheduled_job(body: JobCreate, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+async def create_scheduled_job(body: JobCreate, project_id: UUID = Depends(resolve_project_member), db: Session = Depends(get_db)):
     """Create a new scheduled or delayed job."""
     if not body.scheduled_at:
         raise HTTPException(status_code=400, detail="scheduled_at is required for scheduled jobs")
@@ -156,3 +211,32 @@ def get_job_executions(job_id: UUID, project_id: UUID = Depends(resolve_project)
         
     executions = db.query(JobExecution).filter(JobExecution.job_id == job_id).order_by(JobExecution.attempt_number.asc()).all()
     return executions
+
+
+@router.post("/{job_id}/logs", response_model=JobLogResponse, status_code=201)
+def create_job_log(job_id: UUID, body: JobLogCreate, project_id: UUID = Depends(resolve_project_member), db: Session = Depends(get_db)):
+    """Append a log line to a job."""
+    job = db.query(Job).join(Queue).filter(Job.id == job_id, Queue.project_id == project_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    log = JobLog(
+        job_id=job_id,
+        message=body.message,
+        level=body.level
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
+
+@router.get("/{job_id}/logs", response_model=list[JobLogResponse])
+def get_job_logs(job_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+    """List logs for a job."""
+    job = db.query(Job).join(Queue).filter(Job.id == job_id, Queue.project_id == project_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    logs = db.query(JobLog).filter(JobLog.job_id == job_id).order_by(JobLog.timestamp.asc()).all()
+    return logs

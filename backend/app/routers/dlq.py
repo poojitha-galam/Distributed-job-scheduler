@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Job, DeadLetterJob, Queue
 from ..schemas import JobResponse, DeadLetterJobResponse, PaginatedResponse
-from ..auth import resolve_project
+from ..auth import resolve_project, resolve_project_admin
 
 router = APIRouter(prefix="/dlq", tags=["dlq"])
 
@@ -30,7 +30,7 @@ def list_dlq(
 
 
 @router.post("/{dlq_id}/retry", response_model=JobResponse)
-def retry_dlq_job(dlq_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def retry_dlq_job(dlq_id: UUID, project_id: UUID = Depends(resolve_project_admin), db: Session = Depends(get_db)):
     """Retry a dead letter job (moves it back to QUEUED)."""
     dlq = db.query(DeadLetterJob).join(Job).join(Queue).filter(DeadLetterJob.id == dlq_id, Queue.project_id == project_id).first()
     if not dlq:

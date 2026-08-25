@@ -9,12 +9,12 @@ from datetime import datetime, timezone
 from ..database import get_db
 from ..models import ScheduledJob, Queue
 from ..schemas import ScheduledJobCreate, ScheduledJobResponse, PaginatedResponse
-from ..auth import resolve_project
+from ..auth import resolve_project, resolve_project_member
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
 @router.post("/", response_model=ScheduledJobResponse, status_code=201)
-def create_schedule(body: ScheduledJobCreate, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def create_schedule(body: ScheduledJobCreate, project_id: UUID = Depends(resolve_project_member), db: Session = Depends(get_db)):
     if not croniter.croniter.is_valid(body.cron_expression):
         raise HTTPException(status_code=400, detail="Invalid cron expression")
     
@@ -68,7 +68,7 @@ def get_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_project),
     return schedule
 
 @router.post("/{schedule_id}/pause", response_model=ScheduledJobResponse)
-def pause_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def pause_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_project_member), db: Session = Depends(get_db)):
     schedule = db.query(ScheduledJob).join(Queue).filter(ScheduledJob.id == schedule_id, Queue.project_id == project_id).first()
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -79,7 +79,7 @@ def pause_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_project
     return schedule
 
 @router.post("/{schedule_id}/resume", response_model=ScheduledJobResponse)
-def resume_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def resume_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_project_member), db: Session = Depends(get_db)):
     schedule = db.query(ScheduledJob).join(Queue).filter(ScheduledJob.id == schedule_id, Queue.project_id == project_id).first()
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -93,7 +93,7 @@ def resume_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_projec
     return schedule
 
 @router.delete("/{schedule_id}", status_code=204)
-def delete_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_project), db: Session = Depends(get_db)):
+def delete_schedule(schedule_id: UUID, project_id: UUID = Depends(resolve_project_member), db: Session = Depends(get_db)):
     schedule = db.query(ScheduledJob).join(Queue).filter(ScheduledJob.id == schedule_id, Queue.project_id == project_id).first()
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
