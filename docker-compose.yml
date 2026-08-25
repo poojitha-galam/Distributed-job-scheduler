@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: jobscheduler
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./worker:/worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/jobscheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  reaper:
+    build: ./backend
+    command: python -m app.reaper
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/jobscheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  scheduler:
+    build: ./backend
+    command: python -m app.scheduler
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/jobscheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  worker-1:
+    build: ./worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/jobscheduler
+      - WORKER_ID=worker-01
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  worker-2:
+    build: ./worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/jobscheduler
+      - WORKER_ID=worker-02
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  worker-3:
+    build: ./worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/jobscheduler
+      - WORKER_ID=worker-03
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

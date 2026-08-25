@@ -1,0 +1,25 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-py"
+}
+
+model Job {
+  id           String   @id @default(uuid())
+  name         String
+  payload      Json
+  status       String   @default("QUEUED")
+  claimed_by   String?
+  claim_token  String?
+  attempt_count Int      @default(0)
+  result       Json?
+  error        String?
+  created_at   DateTime @default(now())
+  started_at   DateTime?
+  completed_at DateTime?
+
+  @@map("jobs")
+}
