@@ -1,61 +1,97 @@
 # Distributed Job Scheduler
 
-A robust, multi-tenant distributed job scheduling system built on Postgres, FastAPI, and Next.js. 
-
-This project implements a complete distributed task queue without relying on Redis or Celery, using PostgreSQL's `SELECT ... FOR UPDATE SKIP LOCKED` for atomic concurrency and safe horizontal scaling.
+## Overview
+The **Distributed Job Scheduler** is a robust, scalable system designed to handle background tasks, scheduled execution, and distributed job processing. It provides a reliable way to manage, monitor, and scale delayed or asynchronous workloads across multiple worker nodes, solving the complexities of distributed task execution with built-in AI-powered failure diagnostics.
 
 ## Features
+- **Multi-Tenant Architecture:** Secure isolation of projects and queues with Role-Based Access Control (RBAC).
+- **Scheduled & Delayed Jobs:** Schedule tasks for future execution or delay processing effortlessly.
+- **Idempotency Guarantees:** Ensures jobs are processed exactly once, even during network retries.
+- **Batch Processing:** Group multiple jobs together for efficient, synchronized execution.
+- **AI Diagnostics:** Automatically analyzes failing jobs using Groq LLMs to provide actionable debugging insights.
+- **Real-Time Dashboard:** A responsive Next.js dashboard with live updates and metrics.
+- **Dead Letter Queue (DLQ):** Automatically catches and stores permanently failed jobs for manual review.
 
-- **Distributed Workers**: Run any number of stateless worker processes simultaneously without duplicate job execution.
-- **Advanced Scheduling**: Supports delayed execution (e.g. "run in 5 minutes") and cron-based recurring jobs.
-- **Robust Retry & DLQ**: Configurable retry policies (fixed, linear, exponential) with a Dead Letter Queue for permanently failed jobs.
-- **Multi-tenant Architecture**: Strong isolation via Projects and Organizations.
-- **API Key & JWT Auth**: API Keys for headless job submission and JWTs for dashboard access.
-- **Queue Management**: Priority ordering, per-queue concurrency limits, and pausing.
-- **Dashboard**: Full-stack Next.js dashboard to monitor jobs, queues, and schedules in real-time.
+## Tech Stack
+- **Frontend:** Next.js, React, Tailwind CSS
+- **Backend:** FastAPI (Python), SQLAlchemy, Pydantic
+- **Database:** PostgreSQL (durable source of truth for job state)
+- **Message Broker:** Redis (fast dispatch, rate limiting, and pub/sub)
+- **AI Integration:** Groq API (for job diagnostics)
+- **Infrastructure:** Docker, Docker Compose
 
-## Prerequisites
+## Installation
 
-- [Docker](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/)
+### Prerequisites
+- Docker and Docker Compose installed
+- A [Groq API Key](https://console.groq.com/keys) for AI diagnostics
 
-## Quickstart
+### Setup Steps
 
-1. **Clone the repository and start the stack:**
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/poojitha-galam/Distributed-job-scheduler.git
+   cd Distributed-job-scheduler
+   ```
+
+2. **Setup environment variables**
+   ```bash
+   cp .env.example .env
+   ```
+   Open the `.env` file and add your Groq API key:
+   ```env
+   GROQ_API_KEY=your_actual_api_key_here
+   ```
+
+3. **Run the project**
    ```bash
    docker compose up --build
    ```
-   This spins up PostgreSQL, the FastAPI Backend, 3 Worker nodes, the Scheduler service, and the Next.js Frontend.
-   
-   > **Note:** Database schema is created automatically on first startup via SQLAlchemy's `create_all()` — no manual migration step is needed. Just run the command above and the backend will provision all tables before accepting requests.
-   
-2. **Access the Dashboard:**
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
-   - Default login is configured via environment variables, or you can sign up via the UI.
+   *This command spins up the Postgres database, Redis, the FastAPI backend, the Scheduler, multiple Worker nodes, and the Next.js frontend.*
 
-3. **Backend API Docs:**
-   Open [http://localhost:8000/docs](http://localhost:8000/docs) to view the interactive OpenAPI documentation.
+## Usage
 
-4. **Shutting it down:**
-   When you're done, you can stop the application by pressing `Ctrl+C` in the terminal where it's running. 
-   If you ran it in detached mode, run:
-   ```bash
-   docker compose down
-   ```
-   > **Note:** Adding the `-v` flag to the down command (`docker compose down -v`) will wipe the PostgreSQL database volume, giving you a completely fresh slate the next time you start it up.
+1. **Access the Dashboard:** Open `http://localhost:3000` in your browser.
+2. **Register/Login:** Create a new account to access your workspace.
+3. **Create a Queue:** Navigate to the Queues tab and create a new job queue.
+4. **Submit Jobs:** Use the dashboard or API to enqueue jobs (immediate, delayed, or scheduled).
+5. **Monitor Execution:** Watch the workers pick up and execute jobs in real-time. If a job fails repeatedly, check the AI summary for a diagnostic breakdown.
 
-## Running Tests
+## Project Structure
 
-The test suite ensures that atomic claiming, scheduling, dead-letter queues, and multi-tenant isolation all function correctly under concurrency.
-
-To run the pytest suite inside the backend container:
-
-```bash
-docker compose exec backend pytest tests/
+```text
+├── backend/            # FastAPI application (API, Scheduler, Reaper)
+├── frontend/           # Next.js web dashboard
+├── worker/             # Job execution nodes (Python)
+├── docs/               # Architecture and design decisions
+├── docker-compose.yml  # Multi-container orchestration
+└── README.md           # Project documentation
 ```
 
-## Known Limitations / Future Work
+## API
+Key REST endpoints (Interactive Swagger docs available at `http://localhost:8000/docs`):
 
-Given the project timeline, the following features were not implemented and would be the next additions for a production version:
-- **Batch Jobs:** Grouping jobs and tracking aggregate group completion.
-- **Idempotency Keys:** Native deduplication on job submission.
-- **Metrics/Charts:** Visualizing throughput over time in the dashboard rather than just current totals.
+- `POST /api/v1/auth/register` - Register a new user
+- `POST /api/v1/jobs` - Enqueue a new job
+- `GET /api/v1/jobs/{id}` - Retrieve job status and AI diagnostics
+- `POST /api/v1/queues` - Create a new message queue
+- `GET /api/v1/schedules` - List recurring scheduled tasks
+
+## Configuration
+The system relies on the following key environment variables (configured automatically in `docker-compose.yml` for local dev):
+
+- `DATABASE_URL`: PostgreSQL connection string
+- `REDIS_URL`: Redis connection string
+- `GROQ_API_KEY`: Required for AI failure analysis features
+
+## Future Improvements
+- **Webhook Integration:** Fire HTTP webhooks upon job completion or failure.
+- **Priority Queues:** Introduce strict priority weighting for urgent tasks.
+- **Advanced Dashboard Analytics:** Add historical charts for throughput and failure rates.
+- **Worker Auto-scaling:** Dynamically spin up worker containers based on queue depth.
+
+## Contributing
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. 
+
+## Author
+Developed by **Galam Poojitha**
