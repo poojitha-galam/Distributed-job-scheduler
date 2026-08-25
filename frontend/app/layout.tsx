@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ThemeProvider } from "../components/ThemeProvider";
-import { DashboardLayout } from "../components/DashboardLayout";
 
 export const metadata: Metadata = {
   title: "Job Scheduler Dashboard",
   description: "Distributed Job Scheduler — Phase 0 Dashboard",
 };
+
+import { LayoutWrapper } from "@/components/LayoutWrapper";
 
 export default function RootLayout({
   children,
@@ -21,12 +21,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>
-        <ThemeProvider>
-          <DashboardLayout>
-            {children}
-          </DashboardLayout>
-        </ThemeProvider>
+      <body style={{ fontFamily: "'Inter', sans-serif" }}>
+        <LayoutWrapper>
+          {children}
+        </LayoutWrapper>
       </body>
     </html>
   );

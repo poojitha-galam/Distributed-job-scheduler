@@ -35,6 +35,14 @@ This project implements a complete distributed task queue without relying on Red
 3. **Backend API Docs:**
    Open [http://localhost:8000/docs](http://localhost:8000/docs) to view the interactive OpenAPI documentation.
 
+4. **Shutting it down:**
+   When you're done, you can stop the application by pressing `Ctrl+C` in the terminal where it's running. 
+   If you ran it in detached mode, run:
+   ```bash
+   docker compose down
+   ```
+   > **Note:** Adding the `-v` flag to the down command (`docker compose down -v`) will wipe the PostgreSQL database volume, giving you a completely fresh slate the next time you start it up.
+
 ## Running Tests
 
 The test suite ensures that atomic claiming, scheduling, dead-letter queues, and multi-tenant isolation all function correctly under concurrency.
