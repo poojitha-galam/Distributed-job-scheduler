@@ -51,6 +51,16 @@ The **Distributed Job Scheduler** is a robust, scalable system designed to handl
 
 ## Usage
 
+### 1. Seed Demo Data (Optional)
+If you want to instantly populate the dashboard with sample queues, standard jobs, delayed jobs, and failing jobs (to see AI diagnostics in action), run the seeder script:
+```bash
+python backend/scripts/seed_demo.py
+```
+This will automatically create a demo account you can log in with:
+- **Email:** `invigilator@demo.com`
+- **Password:** `password123`
+
+### 2. Manual Usage
 1. **Access the Dashboard:** Open `http://localhost:3000` in your browser.
 2. **Register/Login:** Create a new account to access your workspace.
 3. **Create a Queue:** Navigate to the Queues tab and create a new job queue.
