@@ -29,23 +29,38 @@ export function TopNav() {
             Distributed background job processing
           </p>
         </div>
-        <button
-          onClick={toggleTheme}
-          className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white/50 px-4 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur-sm transition-all hover:bg-white hover:shadow dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800"
-          aria-label="Toggle theme"
-        >
-          {theme === "dark" ? (
-            <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-              Light
-            </>
-          ) : (
-            <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-              Dark
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              localStorage.removeItem("cws_token");
+              localStorage.removeItem("cws_project_id");
+              window.location.href = "/login";
+            }}
+            className="flex h-9 items-center gap-2 rounded-xl border border-red-200 bg-red-50/50 px-4 text-xs font-semibold text-red-600 shadow-sm backdrop-blur-sm transition-all hover:bg-red-50 hover:shadow dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+            aria-label="Logout"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            Logout
+          </button>
+          
+          <button
+            onClick={toggleTheme}
+            className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white/50 px-4 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur-sm transition-all hover:bg-white hover:shadow dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800"
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                Light
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                Dark
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       <nav className="mt-6 flex items-center gap-6 ml-10">
