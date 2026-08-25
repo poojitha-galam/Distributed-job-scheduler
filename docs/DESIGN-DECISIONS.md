@@ -2,15 +2,15 @@
 
 Throughout the development of the Distributed Job Scheduler, several deliberate architectural choices were made to optimize for simplicity, robustness, and ease of deployment.
 
-## PostgreSQL vs. Redis for the Message Broker
+## PostgreSQL and Redis for the Message Broker
 
-A common approach for building job queues is to use Redis as the primary message broker (e.g., Celery, BullMQ). We opted for a pure-PostgreSQL approach instead for the following reasons:
+A common approach for building job queues is to use Redis as the primary message broker (e.g., Celery, BullMQ) or purely PostgreSQL. We opted for a hybrid approach using both PostgreSQL and Redis for the following reasons:
 
-1. **Simplicity of Operational Stack:** By keeping both application state and queue state in Postgres, we eliminate the need to run, monitor, and scale a separate Redis cluster.
-2. **Transactional Guarantees:** When a job transitions from QUEUED to CLAIMED, it happens in an atomic database transaction. Postgres provides out-of-the-box ACID compliance. 
-3. **Relational Querying:** The Next.js dashboard needs to join Jobs to their corresponding Queues, Projects, and Users to display rich tables with sorting and filtering. Doing this natively with SQL `JOIN`s is trivial, whereas aggregating state across Postgres and Redis would require complex manual synchronization.
+1. **Fast Dispatch and Rate Limiting:** Redis is used for high-speed dispatch of events, pub/sub for WebSocket updates, and rate limiting APIs. This reduces the load on the primary database for transient state.
+2. **Durable Source of Truth:** PostgreSQL remains the durable source of truth for job claims and long-term state. When a job transitions from QUEUED to CLAIMED, it happens in an atomic database transaction using `SELECT ... FOR UPDATE SKIP LOCKED`.
+3. **Relational Querying:** The Next.js dashboard needs to join Jobs to their corresponding Queues, Projects, and Users to display rich tables with sorting and filtering. Keeping the permanent state in Postgres makes this trivial with native SQL `JOIN`s.
 
-The performance trade-off is negligible for moderate-to-high workloads due to `SELECT ... FOR UPDATE SKIP LOCKED`, which allows high concurrent throughput without the lock contention that typically plagues relational queues.
+**Trade-off:** Introducing Redis adds operational complexity. Furthermore, there is a small durability window: a Redis outage before persistence syncs could delay or lose an unclaimed job in the transient pipeline before it reaches the Postgres durable layer, though we mitigate this with Redis persistence (`--appendonly yes`).
 
 ## API Polling vs. WebSockets (Dashboard)
 
