@@ -50,39 +50,55 @@ export default function Register() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 dark:bg-slate-950 sm:px-8">
-      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="mb-6 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Create an Account</h1>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Full Name</label>
+    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10 sm:px-8 relative overflow-hidden">
+      {/* Background Glows */}
+      <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-blue-600/20 blur-[128px] mix-blend-screen pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-indigo-600/20 blur-[128px] mix-blend-screen pointer-events-none"></div>
+
+      <form onSubmit={handleSubmit} className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-slate-700/80">
+        <div className="mb-8 flex flex-col items-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg glow-blue mb-5">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Create an Account</h1>
+          <p className="mt-2 text-sm text-slate-400">Join the Job Scheduler platform</p>
+        </div>
+
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5 relative group">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 group-focus-within:text-blue-400 transition-colors">Full Name</label>
             <input type="text" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-500" />
+              className="rounded-xl border border-slate-700/50 bg-slate-950/50 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 outline-none transition-all focus:border-blue-500 focus:bg-slate-900 focus:ring-1 focus:ring-blue-500 hover:border-slate-600" />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Email Address</label>
+          <div className="flex flex-col gap-1.5 relative group">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 group-focus-within:text-blue-400 transition-colors">Email Address</label>
             <input type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-500" />
+              className="rounded-xl border border-slate-700/50 bg-slate-950/50 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 outline-none transition-all focus:border-blue-500 focus:bg-slate-900 focus:ring-1 focus:ring-blue-500 hover:border-slate-600" />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Organization Name</label>
+          <div className="flex flex-col gap-1.5 relative group">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 group-focus-within:text-blue-400 transition-colors">Organization Name</label>
             <input type="text" placeholder="Acme Corp" value={orgName} onChange={e => setOrgName(e.target.value)} required
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-500" />
+              className="rounded-xl border border-slate-700/50 bg-slate-950/50 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 outline-none transition-all focus:border-blue-500 focus:bg-slate-900 focus:ring-1 focus:ring-blue-500 hover:border-slate-600" />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Password</label>
+          <div className="flex flex-col gap-1.5 relative group">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 group-focus-within:text-blue-400 transition-colors">Password</label>
             <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-500" />
+              className="rounded-xl border border-slate-700/50 bg-slate-950/50 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 outline-none transition-all focus:border-blue-500 focus:bg-slate-900 focus:ring-1 focus:ring-blue-500 hover:border-slate-600" />
           </div>
           
-          {error && <p className="text-sm font-medium text-red-500 dark:text-red-400">{error}</p>}
+          {error && (
+            <div className="rounded-lg bg-red-900/30 px-4 py-3 text-sm font-medium text-red-400 border border-red-900/50 flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              {error}
+            </div>
+          )}
           
-          <button type="submit" className="mt-2 w-full rounded-md bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500">
-            Register
+          <button type="submit" className="mt-4 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-blue-500/25 active:scale-[0.98]">
+            Create Account
           </button>
         </div>
-        <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-          Already have an account? <Link href="/login" className="font-semibold text-blue-600 hover:underline dark:text-blue-400">Log in</Link>
+        <p className="mt-8 text-center text-sm text-slate-400">
+          Already have an account? <Link href="/login" className="font-semibold text-blue-400 hover:text-blue-300 transition-colors">Log in here</Link>
         </p>
       </form>
     </main>
