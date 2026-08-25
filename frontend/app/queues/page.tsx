@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchApi, getAuthToken } from "@/lib/api";
-import { Search, MoreVertical, ListTree } from "lucide-react";
+import { TopNav } from "@/components/TopNav";
 
 interface QueueData {
   id: string;
@@ -55,48 +55,47 @@ export default function Queues() {
     fetchQueues();
     const id = setInterval(fetchQueues, 2000);
     return () => clearInterval(id);
-  }, [fetchQueues]);
+  }, [fetchQueues, router]);
 
   async function createQueue(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      const res = await fetchApi(`/queues/`, {
+      const res = await fetchApi("/queues/", {
         method: "POST",
-        body: JSON.stringify({ name: newName, priority: newPriority, concurrency_limit: newConcurrency }),
+        body: JSON.stringify({ name: newName, priority: newPriority, concurrency_limit: newConcurrency })
       });
       if (!res.ok) {
-        const d = await res.json().catch(() => null);
-        throw new Error(d?.detail || `HTTP ${res.status}`);
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.detail || `HTTP ${res.status}`);
       }
-      setNewName("");
-      setNewPriority(0);
-      setNewConcurrency(10);
-      setShowForm(false);
+      setNewName(""); setNewPriority(0); setNewConcurrency(10); setShowForm(false);
       fetchQueues();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to create queue");
     }
-  }
-
-  async function togglePause(q: QueueData) {
-    await fetchApi(`/queues/${q.id}/${q.paused ? "resume" : "pause"}`, { method: "POST" });
-    fetchQueues();
   }
 
   async function deleteQueue(q: QueueData) {
-    const res = await fetchApi(`/queues/${q.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const d = await res.json().catch(() => null);
-      alert(d?.detail || "Delete failed");
-    }
-    fetchQueues();
+    if (!confirm(`Delete queue ${q.name}?`)) return;
+    try {
+      await fetchApi(`/queues/${q.id}`, { method: "DELETE" });
+      fetchQueues();
+    } catch (err) { alert("Failed to delete"); }
   }
 
-  async function saveEdit(queueId: string) {
-    await fetchApi(`/queues/${queueId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ priority: editPriority, concurrency_limit: editConcurrency }),
+  async function togglePause(q: QueueData) {
+    const action = q.paused ? "resume" : "pause";
+    try {
+      await fetchApi(`/queues/${q.id}/${action}`, { method: "POST" });
+      fetchQueues();
+    } catch (err) { alert(`Failed to ${action}`); }
+  }
+
+  async function saveEdit(id: string) {
+    await fetchApi(`/queues/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ priority: editPriority, concurrency_limit: editConcurrency })
     });
     setEditingId(null);
     fetchQueues();
@@ -109,159 +108,133 @@ export default function Queues() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-12">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Routing Queues</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage concurrency and priority for job queues</p>
-        </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm"
-        >
-          + New Queue
-        </button>
-      </div>
+    <main className="min-h-screen px-4 py-8 sm:px-8">
+      <div className="mx-auto max-w-6xl">
+        <TopNav />
 
-      {showForm && (
-        <form onSubmit={createQueue} className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-bold text-slate-800 flex items-center gap-2">
-            <ListTree className="h-4 w-4 text-blue-600" />
-            Create Queue
-          </h2>
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-              <label className="text-[11px] font-bold tracking-widest text-slate-500 uppercase">Name</label>
-              <input type="text" value={newName} onChange={e => setNewName(e.target.value)} required
-                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-colors" />
-            </div>
-            <div className="flex flex-col gap-1.5 w-32">
-              <label className="text-[11px] font-bold tracking-widest text-slate-500 uppercase">Priority</label>
-              <input type="number" value={newPriority} onChange={e => setNewPriority(+e.target.value)}
-                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-colors" />
-            </div>
-            <div className="flex flex-col gap-1.5 w-32">
-              <label className="text-[11px] font-bold tracking-widest text-slate-500 uppercase">Concurrency</label>
-              <input type="number" min={1} value={newConcurrency} onChange={e => setNewConcurrency(+e.target.value)}
-                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-colors" />
-            </div>
-            <button type="submit" className="rounded-lg bg-emerald-600 px-6 py-2 h-10 text-sm font-semibold text-white hover:bg-emerald-500 transition">
-              Create
-            </button>
-          </div>
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-        </form>
-      )}
-
-      {/* Table Section */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">Active Queues</h2>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search Here..." 
-              className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-500 w-64"
-            />
-          </div>
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Queues</h2>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500"
+          >
+            {showForm ? "Cancel" : "+ New Queue"}
+          </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="text-xs font-bold text-slate-900 uppercase bg-white border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">Priority</th>
-                <th className="px-6 py-4">Concurrency</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Q / Run / Done</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {queues.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
-                    No queues found
-                  </td>
+        {showForm && (
+          <form onSubmit={createQueue} className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="mb-5 text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Create Queue</h2>
+            <div className="flex flex-wrap items-end gap-5">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Name</label>
+                <input type="text" value={newName} onChange={e => setNewName(e.target.value)} required
+                  className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Priority</label>
+                <input type="number" value={newPriority} onChange={e => setNewPriority(+e.target.value)}
+                  className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Concurrency</label>
+                <input type="number" min={1} value={newConcurrency} onChange={e => setNewConcurrency(+e.target.value)}
+                  className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+              </div>
+              <button type="submit" className="rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500">
+                Create
+              </button>
+            </div>
+            {error && <p className="mt-4 text-sm text-red-500 dark:text-red-400">{error}</p>}
+          </form>
+        )}
+
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-400">
+                  <th className="px-5 py-3">Name</th>
+                  <th className="px-5 py-3">Priority</th>
+                  <th className="px-5 py-3">Concurrency</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Q / Run / Done</th>
+                  <th className="px-5 py-3">Actions</th>
                 </tr>
-              )}
-              {queues.map(q => (
-                <tr key={q.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-slate-900">{q.name}</td>
-                  <td className="px-6 py-4">
-                    {editingId === q.id ? (
-                      <input type="number" value={editPriority} onChange={e => setEditPriority(+e.target.value)}
-                        className="w-20 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900" />
-                    ) : (
-                      <span className="font-semibold">{q.priority}</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {editingId === q.id ? (
-                      <input type="number" min={1} value={editConcurrency} onChange={e => setEditConcurrency(+e.target.value)}
-                        className="w-20 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900" />
-                    ) : (
-                      <span>
-                        <span className="font-semibold text-slate-900">{q.stats.claimed + q.stats.running}</span>
-                        <span className="text-slate-400 mx-1">/</span>
-                        <span className="text-slate-500">{q.concurrency_limit}</span>
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-bold tracking-wide ${
-                      q.paused
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-emerald-100 text-emerald-700"
-                    }`}>
-                      {q.paused ? "PAUSED" : "ACTIVE"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500 text-xs font-medium space-x-1.5">
-                    <span className="text-slate-400">{q.stats.queued}</span>
-                    <span className="text-slate-300">/</span>
-                    <span className="text-blue-600">{q.stats.claimed + q.stats.running}</span>
-                    <span className="text-slate-300">/</span>
-                    <span className="text-emerald-600">{q.stats.completed}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
+              </thead>
+              <tbody>
+                {queues.length === 0 && (
+                  <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-500 dark:text-slate-400">No queues yet.</td></tr>
+                )}
+                {queues.map(q => (
+                  <tr key={q.id} className="border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800/50 dark:hover:bg-slate-800/50">
+                    <td className="px-5 py-3.5 font-medium text-slate-900 dark:text-slate-200">{q.name}</td>
+                    <td className="px-5 py-3.5">
                       {editingId === q.id ? (
-                        <>
-                          <button onClick={() => saveEdit(q.id)}
-                            className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition">Save</button>
-                          <button onClick={() => setEditingId(null)}
-                            className="rounded bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-300 transition">Cancel</button>
-                        </>
+                        <input type="number" value={editPriority} onChange={e => setEditPriority(+e.target.value)}
+                          className="w-16 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
                       ) : (
-                        <>
-                          <button onClick={() => togglePause(q)}
-                            className="rounded bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-200 transition border border-slate-200">
-                            {q.paused ? "Resume" : "Pause"}
-                          </button>
-                          <button onClick={() => startEdit(q)}
-                            className="rounded bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-100 transition border border-blue-100">
-                            Edit
-                          </button>
-                          {q.name !== "default" && (
-                            <button onClick={() => deleteQueue(q)}
-                              className="rounded bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100 transition border border-red-100">
-                              Delete
-                            </button>
-                          )}
-                        </>
+                        <span className="text-slate-700 dark:text-slate-300">{q.priority}</span>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {editingId === q.id ? (
+                        <input type="number" min={1} value={editConcurrency} onChange={e => setEditConcurrency(+e.target.value)}
+                          className="w-16 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+                      ) : (
+                        <span className="text-slate-700 dark:text-slate-300">
+                          {q.stats.claimed + q.stats.running}/{q.concurrency_limit}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-widest uppercase ${
+                        q.paused
+                          ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                          : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      }`}>
+                        {q.paused ? "PAUSED" : "ACTIVE"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 font-mono text-xs text-slate-500 dark:text-slate-400">
+                      {q.stats.queued} / {q.stats.claimed + q.stats.running} / {q.stats.completed}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex gap-2">
+                        {editingId === q.id ? (
+                          <>
+                            <button onClick={() => saveEdit(q.id)}
+                              className="rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50">Save</button>
+                            <button onClick={() => setEditingId(null)}
+                              className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => togglePause(q)}
+                              className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                              {q.paused ? "Resume" : "Pause"}
+                            </button>
+                            <button onClick={() => startEdit(q)}
+                              className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                              Edit
+                            </button>
+                            {q.name !== "default" && (
+                              <button onClick={() => deleteQueue(q)}
+                                className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100 dark:border-red-900/50 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50">
+                                Delete
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

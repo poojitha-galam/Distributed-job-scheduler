@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import Job
+from ..models import Job, Queue
 from ..auth import resolve_project
 
 router = APIRouter(prefix="/workers", tags=["workers"])
@@ -13,8 +13,8 @@ def get_workers_status(
     db: Session = Depends(get_db),
     project_id: uuid.UUID = Depends(resolve_project)
 ):
-    running_jobs = db.query(Job).filter(
-        Job.project_id == project_id,
+    running_jobs = db.query(Job).join(Job.queue).filter(
+        Queue.project_id == project_id,
         Job.status == "RUNNING",
         Job.claimed_by.isnot(None)
     ).all()

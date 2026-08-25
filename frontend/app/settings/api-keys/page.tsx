@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchApi, getProjectId, getAuthToken } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { KeyRound } from "lucide-react";
+import { fetchApi, getProjectId, getAuthToken } from "@/lib/api";
+import { TopNav } from "@/components/TopNav";
 
 interface ApiKey {
   id: string;
@@ -27,7 +27,7 @@ export default function ApiKeysSettings() {
       return;
     }
     loadKeys();
-  }, []);
+  }, [router]);
 
   async function loadKeys() {
     try {
@@ -81,81 +81,79 @@ export default function ApiKeysSettings() {
   if (loading) return null;
 
   return (
-    <div className="max-w-7xl mx-auto pb-12">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">API Keys</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage programmatic access to your projects</p>
-        </div>
-      </div>
+    <main className="min-h-screen px-4 py-8 sm:px-8">
+      <div className="mx-auto max-w-6xl">
+        <TopNav />
 
-      {newKey && (
-        <div className="mb-8 rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
-          <h2 className="mb-2 text-sm font-bold uppercase tracking-widest text-emerald-800">Key Created Successfully</h2>
-          <p className="mb-4 text-sm text-emerald-700">Please copy this key now. You won't be able to see it again.</p>
-          <div className="rounded-lg bg-white p-4 font-mono text-emerald-700 break-all border border-emerald-200 shadow-inner">
-            {newKey}
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">API Keys</h2>
+        </div>
+
+        {newKey && (
+          <div className="mb-8 rounded-xl border border-green-200 bg-green-50 p-6 shadow-sm dark:border-green-900/30 dark:bg-green-900/10">
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-green-700 dark:text-green-500">Key Created Successfully</h2>
+            <p className="mb-4 text-sm text-green-600 dark:text-green-400">Please copy this key now. You won't be able to see it again.</p>
+            <div className="rounded-md border border-green-200 bg-white p-4 font-mono text-slate-900 break-all shadow-sm dark:border-green-800 dark:bg-slate-950 dark:text-slate-100">
+              {newKey}
+            </div>
+            <button onClick={() => setNewKey(null)} className="mt-4 text-sm font-medium text-green-700 hover:underline dark:text-green-400">
+              Dismiss
+            </button>
           </div>
-          <button onClick={() => setNewKey(null)} className="mt-4 text-sm font-semibold text-emerald-700 hover:text-emerald-800 hover:underline">
-            Dismiss
+        )}
+
+        <form onSubmit={handleCreate} className="mb-8 flex items-end gap-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-1 flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">New Key Name</label>
+            <input type="text" placeholder="e.g. Production Worker" value={name} onChange={e => setName(e.target.value)} required
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-500" />
+          </div>
+          <button type="submit" className="rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500">
+            Generate Key
           </button>
-        </div>
-      )}
+        </form>
 
-      <form onSubmit={handleCreate} className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex items-end gap-4">
-        <div className="flex-1 flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold tracking-widest text-slate-500 uppercase flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-blue-600" />
-            New Key Name
-          </label>
-          <input type="text" placeholder="e.g. Production Worker" value={name} onChange={e => setName(e.target.value)} required
-            className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition-colors focus:border-blue-500 focus:bg-white" />
-        </div>
-        <button type="submit" className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 shadow-sm h-[42px]">
-          Generate Key
-        </button>
-      </form>
-
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="text-xs font-bold text-slate-900 uppercase bg-white border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">Prefix</th>
-                <th className="px-6 py-4">Created</th>
-                <th className="px-6 py-4">Last Used</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {keys.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400">No API keys generated yet.</td></tr>
-              )}
-              {keys.map(k => (
-                <tr key={k.id} className={`transition-colors ${k.revoked ? 'opacity-50 bg-slate-50/50' : 'hover:bg-slate-50'}`}>
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {k.name}
-                    {k.revoked && <span className="ml-2 inline-flex items-center rounded-sm px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase bg-red-100 text-red-700">Revoked</span>}
-                  </td>
-                  <td className="px-6 py-4 font-mono text-xs text-slate-500">{k.key_prefix}...</td>
-                  <td className="px-6 py-4 text-slate-500">{new Date(k.created_at).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-slate-500">{k.last_used_at ? new Date(k.last_used_at).toLocaleString() : "Never"}</td>
-                  <td className="px-6 py-4 text-right">
-                    {!k.revoked ? (
-                      <button onClick={() => handleRevoke(k.id)} className="text-red-600 hover:text-red-700 transition text-xs font-bold uppercase tracking-wide">
-                        Revoke
-                      </button>
-                    ) : (
-                      <span className="text-slate-400 text-xs font-bold uppercase tracking-wide cursor-not-allowed">Revoked</span>
-                    )}
-                  </td>
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-400">
+                  <th className="px-5 py-3">Name</th>
+                  <th className="px-5 py-3">Prefix</th>
+                  <th className="px-5 py-3">Created</th>
+                  <th className="px-5 py-3">Last Used</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {keys.length === 0 && (
+                  <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-500 dark:text-slate-400">No API keys generated yet.</td></tr>
+                )}
+                {keys.map(k => (
+                  <tr key={k.id} className={`border-b border-slate-100 transition-colors dark:border-slate-800/50 ${k.revoked ? 'bg-slate-50/50 opacity-60 dark:bg-slate-950/50' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
+                    <td className="px-5 py-3.5 font-medium text-slate-900 dark:text-slate-200">
+                      {k.name}
+                      {k.revoked && <span className="ml-3 inline-flex items-center rounded-sm border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase text-red-600 dark:border-red-900/50 dark:bg-red-900/30 dark:text-red-400">Revoked</span>}
+                    </td>
+                    <td className="px-5 py-3.5 font-mono text-xs text-slate-500 dark:text-slate-400">{k.key_prefix}...</td>
+                    <td className="px-5 py-3.5 text-xs text-slate-500 dark:text-slate-400">{new Date(k.created_at).toLocaleString()}</td>
+                    <td className="px-5 py-3.5 text-xs text-slate-500 dark:text-slate-400">{k.last_used_at ? new Date(k.last_used_at).toLocaleString() : "Never"}</td>
+                    <td className="px-5 py-3.5 text-right">
+                      {!k.revoked ? (
+                        <button onClick={() => handleRevoke(k.id)} className="text-xs font-semibold text-red-600 hover:text-red-500 transition dark:text-red-400 dark:hover:text-red-300">
+                          Revoke
+                        </button>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-400 cursor-not-allowed">Revoked</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
