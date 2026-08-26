@@ -20,8 +20,10 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+from fastapi import APIRouter, Depends, HTTPException, status, Response
+
 @router.post("/register")
-def register(req: RegisterRequest, db: Session = Depends(get_db)):
+def register(req: RegisterRequest, response: Response, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == req.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
         
@@ -83,17 +85,52 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     
     # Return JWT
     token = create_access_token({"sub": str(user_id)})
+    response.set_cookie(
+        key="cws_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=24 * 3600
+    )
+    response.set_cookie(
+        key="cws_auth_status",
+        value="1",
+        httponly=False,
+        samesite="lax",
+        max_age=24 * 3600
+    )
     return {"access_token": token, "token_type": "bearer"}
 
 
 @router.post("/login")
-def login(req: LoginRequest, db: Session = Depends(get_db)):
+def login(req: LoginRequest, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
         
     token = create_access_token({"sub": str(user.id)})
+    response.set_cookie(
+        key="cws_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=24 * 3600
+    )
+    response.set_cookie(
+        key="cws_auth_status",
+        value="1",
+        httponly=False,
+        samesite="lax",
+        max_age=24 * 3600
+    )
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(key="cws_token", samesite="lax")
+    response.delete_cookie(key="cws_auth_status", samesite="lax")
+    return {"message": "Logged out successfully"}
 
 
 @router.get("/me")

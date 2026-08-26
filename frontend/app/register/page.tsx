@@ -21,6 +21,7 @@ export default function Register() {
       const res = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password, name, organization_name: orgName }),
       });
 
@@ -30,11 +31,11 @@ export default function Register() {
       }
 
       const data = await res.json();
-      localStorage.setItem("cws_token", data.access_token);
+      // Token is now set in an HttpOnly cookie by the backend
 
       // Fetch /me to get project_id
       const meRes = await fetch(`${BASE_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${data.access_token}` }
+        credentials: "include",
       });
       if (meRes.ok) {
         const meData = await meRes.json();

@@ -34,17 +34,21 @@ def create_access_token(data: dict) -> str:
     return encoded_jwt
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+from fastapi import Depends, HTTPException, status, Header, Request
+
+def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if not token:
+    
+    actual_token = request.cookies.get("cws_token") or token
+    if not actual_token:
         raise credentials_exception
         
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(actual_token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
@@ -113,6 +117,7 @@ def require_project_access(project_id: uuid.UUID, user: User | None = None, api_
 
 
 def get_optional_auth(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     x_api_key: str = Header(None),
     db: Session = Depends(get_db)
@@ -121,9 +126,10 @@ def get_optional_auth(
     if x_api_key:
         return get_project_from_api_key(x_api_key, db)
     
-    if token:
+    actual_token = request.cookies.get("cws_token") or token
+    if actual_token:
         try:
-            return get_current_user(token, db)
+            return get_current_user(request, token, db)
         except HTTPException:
             pass # Fall through to 401
             

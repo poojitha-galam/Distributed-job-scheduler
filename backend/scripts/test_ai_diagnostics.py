@@ -40,7 +40,6 @@ def test_ai_diagnostics():
 
     # 6. Create a job that fails
     r = requests.post(f"{BASE_URL}/jobs/", headers=api_headers, json={
-        "name": "Failing Job",
         "queue_id": queue_id,
         "payload": {"fail_times": 5, "work_seconds": 0},
         "max_attempts": 1,

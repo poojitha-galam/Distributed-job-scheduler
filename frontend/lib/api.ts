@@ -2,9 +2,10 @@ export const BASE_URL = "http://localhost:8000/api/v1";
 
 export function getAuthToken() {
   if (typeof window !== "undefined") {
-    return localStorage.getItem("cws_token");
+    // We can't read the HttpOnly token, so we check the auth_status cookie
+    return document.cookie.includes("cws_auth_status=1");
   }
-  return null;
+  return false;
 }
 
 export function getProjectId() {
@@ -15,13 +16,9 @@ export function getProjectId() {
 }
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
-  const token = getAuthToken();
   const projectId = getProjectId();
 
   const headers = new Headers(options.headers || {});
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
   if (!headers.has("Content-Type") && options.method !== "GET" && options.method !== "DELETE") {
       headers.set("Content-Type", "application/json");
   }
@@ -33,12 +30,13 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     url += `${sep}project_id=${projectId}`;
   }
 
-  const response = await fetch(url, { cache: "no-store", ...options, headers });
+  // Include credentials so HttpOnly cookies are sent
+  const response = await fetch(url, { cache: "no-store", credentials: "include", ...options, headers });
   
   if (response.status === 401) {
       if (typeof window !== "undefined") {
-          localStorage.removeItem("cws_token");
           localStorage.removeItem("cws_project_id");
+          // cws_token and cws_auth_status should be cleared by backend on logout
           window.location.href = "/login";
       }
   }

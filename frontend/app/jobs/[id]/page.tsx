@@ -28,6 +28,7 @@ interface Job {
   retry_policy: string;
   last_error: string | null;
   next_retry_at: string | null;
+  ai_summary: string | null;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -160,6 +161,20 @@ export default function JobDetailPage() {
               <pre className="overflow-auto whitespace-pre-wrap rounded-lg bg-white/80 p-4 font-mono text-xs font-medium text-red-700 shadow-sm dark:bg-slate-950/50 dark:text-red-400">
                 {job.error || job.last_error}
               </pre>
+            </div>
+          )}
+
+          {job.ai_summary && (
+            <div className="mt-8 rounded-xl border border-purple-200/50 bg-purple-50/50 p-6 dark:border-purple-900/30 dark:bg-purple-950/20">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                AI Diagnostic Summary
+              </h2>
+              <div className="prose prose-sm dark:prose-invert prose-purple max-w-none rounded-lg bg-white/80 p-5 shadow-sm dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 leading-relaxed">
+                {job.ai_summary.split('\n').map((line, i) => (
+                  <p key={i} className="mb-2 last:mb-0">{line}</p>
+                ))}
+              </div>
             </div>
           )}
           
