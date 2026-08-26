@@ -28,7 +28,12 @@ interface Job {
   retry_policy: string;
   last_error: string | null;
   next_retry_at: string | null;
-  ai_summary: string | null;
+  ai_summary: {
+    severity: string;
+    transience: string;
+    root_cause: string;
+    suggested_fix: string;
+  } | null;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -170,10 +175,19 @@ export default function JobDetailPage() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
                 AI Diagnostic Summary
               </h2>
-              <div className="prose prose-sm dark:prose-invert prose-purple max-w-none rounded-lg bg-white/80 p-5 shadow-sm dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 leading-relaxed">
-                {job.ai_summary.split('\n').map((line, i) => (
-                  <p key={i} className="mb-2 last:mb-0">{line}</p>
-                ))}
+              <div className="flex flex-col gap-4 rounded-lg bg-white/80 p-5 shadow-sm dark:bg-slate-950/50">
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-col gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Severity</span><span className="font-semibold text-purple-700 dark:text-purple-400">{job.ai_summary.severity}</span></div>
+                  <div className="flex flex-col gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Transience</span><span className="font-semibold text-purple-700 dark:text-purple-400">{job.ai_summary.transience}</span></div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Root Cause</span>
+                  <p className="text-sm text-slate-800 dark:text-slate-200">{job.ai_summary.root_cause}</p>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Suggested Fix</span>
+                  <p className="text-sm text-slate-800 dark:text-slate-200">{job.ai_summary.suggested_fix}</p>
+                </div>
               </div>
             </div>
           )}
